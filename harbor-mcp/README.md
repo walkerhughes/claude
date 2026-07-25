@@ -44,7 +44,9 @@ You do not need a global harbor install: harbor ships inside the plugin's enviro
 uv sync
 ```
 
-The same [`.mcp.json`](.mcp.json) serves both cases: it launches `uv run --project ${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
+The same [`.mcp.json`](.mcp.json) serves both cases: it runs [`scripts/start-server.sh`](scripts/start-server.sh) at `${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
+
+That wrapper exists for a reason worth knowing: naming `uv` directly as the command assumes it is on whatever PATH the MCP client spawns with, and it often is not. A Homebrew `uv` lives in `/opt/homebrew/bin`, which is missing from the minimal PATH some launch contexts provide, and the server then fails with an opaque JSON-RPC `-32000` and no explanation. The wrapper searches PATH plus the common install locations, resolves the plugin root from its own location, and prints an actionable message to stderr if `uv` genuinely is not installed.
 
 ## Tools
 
