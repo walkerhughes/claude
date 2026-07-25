@@ -44,9 +44,15 @@ You do not need a global harbor install: harbor ships inside the plugin's enviro
 uv sync
 ```
 
-The same [`.mcp.json`](.mcp.json) serves both cases: it runs [`scripts/start-server.sh`](scripts/start-server.sh) at `${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
+Run the server directly:
 
-That wrapper exists for a reason worth knowing: naming `uv` directly as the command assumes it is on whatever PATH the MCP client spawns with, and it often is not. A Homebrew `uv` lives in `/opt/homebrew/bin`, which is missing from the minimal PATH some launch contexts provide, and the server then fails with an opaque JSON-RPC `-32000` and no explanation. The wrapper searches PATH plus the common install locations, resolves the plugin root from its own location, and prints an actionable message to stderr if `uv` genuinely is not installed.
+```bash
+./scripts/start-server.sh
+```
+
+[`.mcp.json`](.mcp.json) is the **plugin** config and only works when loaded as a plugin, because `${CLAUDE_PLUGIN_ROOT}` is substituted by the plugin loader. Do not add a `:-default` to it to make local discovery work, which is what broke it for three releases: the `:-default` form is handled by environment-variable expansion, which does not know `CLAUDE_PLUGIN_ROOT`, so the default silently won and the server was launched against whatever project the user happened to be in. It failed as an opaque JSON-RPC `-32000`, visible only in `~/Library/Caches/claude-cli-nodejs/<project>/mcp-logs-plugin-harbor-mcp-harbor-hub/`. Two tests in [tests/unit/test_plugin_config.py](tests/unit/test_plugin_config.py) now guard this.
+
+[`scripts/start-server.sh`](scripts/start-server.sh) resolves the plugin root from its own location, finds `uv` on PATH or in the common install directories, drops an inherited `VIRTUAL_ENV`, and writes diagnostics to stderr so stdout stays a clean JSON-RPC channel.
 
 ## Tools
 
