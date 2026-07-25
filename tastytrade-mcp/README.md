@@ -87,7 +87,18 @@ touch ~/.tastytrade-mcp/credentials.json && chmod 600 ~/.tastytrade-mcp/credenti
 }
 ```
 
+The environment-variable spellings work too, so a file written from your `.env` needs no renaming:
+
+| Canonical | Also accepted |
+|-----------|---------------|
+| `client_id` | `TT_CLIENT_ID` |
+| `client_secret` | `TT_SECRET` |
+| `refresh_token` | `TT_REFRESH` |
+| `base_url` | `API_BASE_URL` |
+
 `base_url` is optional and defaults to `api.tastyworks.com`.
+
+There is no username or password: this server authenticates with the OAuth refresh-token grant only. `TT_USERNAME` and `TT_PASSWORD` keys are ignored, so delete them rather than leaving secrets at rest for nothing to read.
 
 **The server refuses to load this file if it is readable by group or others**, and tells you to `chmod 600`. Together the secret and refresh token grant full account access, including order placement when trading is enabled.
 

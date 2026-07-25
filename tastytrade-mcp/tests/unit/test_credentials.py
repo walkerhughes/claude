@@ -19,6 +19,9 @@ from src.credentials import (
 pytestmark = pytest.mark.unit
 
 COMPLETE = {"client_id": "cid", "client_secret": "sec", "refresh_token": "ref"}
+# The same values under the environment-variable spellings, which is how these
+# are named everywhere else and therefore what people actually write down.
+COMPLETE_TT = {"TT_CLIENT_ID": "cid", "TT_SECRET": "sec", "TT_REFRESH": "ref"}
 
 
 @pytest.fixture(autouse=True)
@@ -167,3 +170,45 @@ async def test_unexpected_exception_never_leaks_a_traceback():
     payload = json.loads(await tool())
     assert payload["error"] == "ZeroDivisionError: boom"
     assert "Traceback" not in json.dumps(payload)
+
+
+def test_accepts_tt_prefixed_key_spellings(tmp_path):
+    """A file written with the env-var names must work, not be rejected.
+
+    This is how the file is most naturally produced: those are the names used in
+    .env.example, the environment, and the Tastytrade docs.
+    """
+    path = write_creds(tmp_path, {**COMPLETE_TT, "API_BASE_URL": "tt.example.com"})
+
+    creds = resolve_credentials(path)
+
+    assert (creds.client_id, creds.client_secret, creds.refresh_token) == ("cid", "sec", "ref")
+    assert creds.base_url == "tt.example.com"
+
+
+def test_snake_case_wins_when_both_spellings_are_present(tmp_path):
+    path = write_creds(tmp_path, {**COMPLETE, **{k: "tt-" + v for k, v in COMPLETE_TT.items()}})
+    assert resolve_credentials(path).client_id == "cid"
+
+
+def test_unused_username_password_keys_are_ignored(tmp_path):
+    """The refresh-token grant needs no username or password; extras must not break it."""
+    path = write_creds(tmp_path, {**COMPLETE_TT, "TT_USERNAME": "u", "TT_PASSWORD": "p"})
+    assert resolve_credentials(path).client_id == "cid"
+
+
+def test_missing_key_error_names_both_spellings_and_what_was_found(tmp_path):
+    path = write_creds(tmp_path, {"TT_USERNAME": "SECRET_USER", "TT_PASSWORD": "SECRET_PASS"})
+
+    with pytest.raises(CredentialsError) as exc:
+        resolve_credentials(path)
+
+    message = str(exc.value)
+    # Both spellings named, so the fix is obvious either way.
+    assert "TT_CLIENT_ID" in message and "client_id" in message
+    # What was actually in the file, so a key-name mismatch is diagnosable.
+    assert "Found: TT_PASSWORD, TT_USERNAME" in message
+    assert "safely delete them" in message
+    # Key names appear; values must not.
+    assert "SECRET_USER" not in message
+    assert "SECRET_PASS" not in message

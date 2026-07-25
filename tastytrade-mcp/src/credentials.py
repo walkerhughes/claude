@@ -34,6 +34,22 @@ ENV_VARS = {
     "refresh_token": "TT_REFRESH",
 }
 
+# Accepted JSON key spellings per field, in preference order. The TT_* forms are
+# accepted because that is how these values are named everywhere else (the
+# environment, .env.example, the Tastytrade docs), so a file written from any of
+# those is the obvious thing to produce and must not be rejected.
+FILE_KEYS: dict[str, tuple[str, ...]] = {
+    "client_id": ("client_id", "TT_CLIENT_ID"),
+    "client_secret": ("client_secret", "TT_SECRET"),
+    "refresh_token": ("refresh_token", "TT_REFRESH"),
+}
+
+BASE_URL_KEYS = ("base_url", "API_BASE_URL")
+
+# Read by nothing: the OAuth refresh-token grant needs no username or password.
+# Named here only so the error path can point out that storing them is pointless.
+UNUSED_KEYS = ("TT_USERNAME", "TT_PASSWORD", "username", "password")
+
 
 class CredentialsError(RuntimeError):
     """Raised when no usable credential set can be resolved."""
@@ -108,17 +124,38 @@ def resolve_credentials(path: Path | None = None) -> Credentials:
         raise CredentialsError(
             f"No Tastytrade credentials found. Create {path} containing "
             '{"client_id": "...", "client_secret": "...", "refresh_token": "..."} '
+            "(the TT_CLIENT_ID / TT_SECRET / TT_REFRESH spellings work too) "
             "with mode 600, or set TT_CLIENT_ID, TT_SECRET and TT_REFRESH."
         )
 
-    missing = sorted(set(ENV_VARS) - set(data))
-    if missing:
-        raise CredentialsError(f"{path} is missing required key(s): {', '.join(missing)}.")
+    values: dict[str, str] = {}
+    missing_keys: list[str] = []
+    for field, keys in FILE_KEYS.items():
+        found = next((data[k] for k in keys if k in data), None)
+        if found is None:
+            missing_keys.append(" or ".join(keys))
+        else:
+            values[field] = found
 
+    if missing_keys:
+        note = ""
+        if any(k in data for k in UNUSED_KEYS):
+            # Worth saying: the OAuth refresh-token grant never reads these, so
+            # they are secrets sitting at rest for no reason.
+            note = (
+                " Note that any username/password keys in the file are unused: "
+                "this server authenticates with the OAuth refresh-token grant only, "
+                "so you can safely delete them."
+            )
+        raise CredentialsError(
+            f"{path} is missing required key(s): {'; '.join(missing_keys)}. Found: {', '.join(sorted(data))}.{note}"
+        )
+
+    file_base_url = next((data[k].strip() for k in BASE_URL_KEYS if data.get(k, "").strip()), "")
     return Credentials(
-        client_id=data["client_id"],
-        client_secret=data["client_secret"],
-        refresh_token=data["refresh_token"],
-        base_url=data.get("base_url", "").strip() or os.environ.get("API_BASE_URL", "").strip() or DEFAULT_BASE_URL,
+        client_id=values["client_id"],
+        client_secret=values["client_secret"],
+        refresh_token=values["refresh_token"],
+        base_url=file_base_url or os.environ.get("API_BASE_URL", "").strip() or DEFAULT_BASE_URL,
         source=str(path),
     )
