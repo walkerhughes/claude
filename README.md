@@ -21,6 +21,10 @@ This repo is also a plugin marketplace. Run these as two separate commands, not 
 
 Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. See each server's README for credentials.
 
+### Shipping a plugin change
+
+**Bump `version` in the plugin's `.claude-plugin/plugin.json` in the same PR.** Claude Code extracts an installed plugin to a cache path keyed by that version, so if it does not change, the cache is never refreshed and users keep running the old code however many times they update or reinstall. The change is invisible rather than broken. The `plugin version` workflow enforces this.
+
 ## Design
 
 These servers follow Honeycomb's [MCP, easy as 1-2-3](https://www.honeycomb.io/blog/mcp-easy-as-1-2-3) guidance: a few curated tools built around real questions rather than raw API endpoints, responses shaped for a model instead of a UI, and typed schemas that steer the model toward valid calls.

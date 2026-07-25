@@ -1,0 +1,48 @@
+name: plugin version
+
+# Claude Code caches an installed plugin at a path keyed by its manifest version
+# (~/.claude/plugins/cache/<marketplace>/<plugin>/<version>). If a change ships
+# without bumping that version, the cache key is unchanged, the extracted copy is
+# never refreshed, and users keep running the old code no matter how many times
+# they update or reinstall. The change is invisible rather than broken, which is
+# the worst way to fail, so this gate makes it loud.
+on:
+  pull_request:
+    paths:
+      - "harbor-mcp/**"
+      - ".github/workflows/plugin-version.yml"
+
+jobs:
+  version-bumped:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a version bump when plugin files change
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          MANIFEST: harbor-mcp/.claude-plugin/plugin.json
+        run: |
+          set -euo pipefail
+
+          # Only the shipped plugin payload matters. Tests and evals are not
+          # copied into the plugin cache, so changing them cannot strand a user.
+          if ! git diff --name-only "$BASE"...HEAD -- harbor-mcp \
+               ':(exclude)harbor-mcp/tests/**' \
+               ':(exclude)harbor-mcp/evals/**' | grep -q .; then
+            echo "No shipped plugin files changed; version bump not required."
+            exit 0
+          fi
+
+          read_version() { python3 -c "import json,sys;print(json.load(sys.stdin)['version'])"; }
+          base_version="$(git show "$BASE:$MANIFEST" | read_version)"
+          head_version="$(read_version < "$MANIFEST")"
+
+          echo "base=$base_version head=$head_version"
+          if [ "$base_version" = "$head_version" ]; then
+            echo "::error file=$MANIFEST::Shipped plugin files changed but version is still $head_version. Bump it, or installed copies will never pick this up."
+            exit 1
+          fi
+          echo "Version bumped $base_version -> $head_version."
