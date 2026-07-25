@@ -1,13 +1,13 @@
 {
   "name": "harbor-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MCP server for the Harbor hub: inspect evaluation jobs, trials, and uploads; publish tasks and datasets when writes are enabled.",
   "author": {
     "name": "Walker Hughes"
   },
   "license": "MIT",
-  "homepage": "https://github.com/walkerhughes/mcps/tree/main/harbor-mcp",
-  "repository": "https://github.com/walkerhughes/mcps",
+  "homepage": "https://github.com/walkerhughes/claude/tree/main/harbor-mcp",
+  "repository": "https://github.com/walkerhughes/claude",
   "keywords": [
     "harbor",
     "evals",

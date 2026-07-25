@@ -4,14 +4,14 @@ An [MCP](https://modelcontextprotocol.io) server for the [Harbor](https://www.ha
 
 It wraps Harbor's own async client classes (`HubClient`, `UploadDB`, `RegistryDB`, `Uploader`, `Downloader`, `Publisher`), so there is no separate API layer to maintain. Harbor reads `HARBOR_API_KEY` and handles token exchange itself.
 
-This lives in the [`mcps`](../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
+This lives in the [`claude`](../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
 
 ## Install as a Claude Code plugin
 
 Two separate commands. The first opens a prompt that expects only the `owner/repo`, so do not paste both lines at once:
 
 ```
-/plugin marketplace add walkerhughes/mcps
+/plugin marketplace add walkerhughes/claude
 ```
 
 ```
