@@ -2,10 +2,21 @@
 
 A collection of [Model Context Protocol](https://modelcontextprotocol.io) servers that give agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) direct access to external services. Each server lives in its own subdirectory with its own setup, tests, and docs.
 
-| Server | What it connects to |
-|--------|---------------------|
-| [`tastytrade-mcp`](tastytrade-mcp/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). |
-| [`harbor-mcp`](harbor-mcp/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. |
+| Server | What it connects to | Plugin |
+|--------|---------------------|--------|
+| [`tastytrade-mcp`](tastytrade-mcp/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). | not yet |
+| [`harbor-mcp`](harbor-mcp/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. | yes |
+
+## Install as a Claude Code plugin
+
+This repo is also a plugin marketplace:
+
+```
+/plugin marketplace add walkerhughes/mcps
+/plugin install harbor-mcp
+```
+
+Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. See each server's README for credentials.
 
 ## Design
 

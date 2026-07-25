@@ -1,9 +1,22 @@
-name: ci
+name: harbor-mcp
 
+# GitHub Actions only reads workflows from the repository root, so every job
+# here sets working-directory to the server's subdirectory. The paths filters
+# keep a change to one server from running the other server's suite.
 on:
   pull_request:
+    paths:
+      - "harbor-mcp/**"
+      - ".github/workflows/harbor-mcp.yml"
   push:
     branches: [main]
+    paths:
+      - "harbor-mcp/**"
+      - ".github/workflows/harbor-mcp.yml"
+
+defaults:
+  run:
+    working-directory: harbor-mcp
 
 jobs:
   lint-unit:
@@ -36,7 +49,12 @@ jobs:
   e2e:
     # Full loop using harbor's oracle agent (runs solve.sh, no LLM), so still
     # deterministic and Anthropic-free. The harbor job runs on Modal.
+    #
+    # Skipped outright without Modal credentials: the suite's own skipif only
+    # checks HARBOR_API_KEY, so a run with the harbor key but no Modal token
+    # would fail rather than skip.
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     env:
       HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
