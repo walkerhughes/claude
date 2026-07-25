@@ -1,9 +1,22 @@
-name: CI
+name: tastytrade-mcp
 
+# GitHub Actions only reads workflows from the repository root, so every job
+# here sets working-directory to the server's subdirectory. The paths filters
+# keep a change to one server from running the other server's suite.
 on:
-  push:
-    branches: [main, mcp-server-refactor]
   pull_request:
+    paths:
+      - "tastytrade-mcp/**"
+      - ".github/workflows/tastytrade-mcp.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tastytrade-mcp/**"
+      - ".github/workflows/tastytrade-mcp.yml"
+
+defaults:
+  run:
+    working-directory: tastytrade-mcp
 
 jobs:
   check:

@@ -1,0 +1,14 @@
+{
+  "name": "walkerhughes-mcps",
+  "owner": {
+    "name": "Walker Hughes",
+    "url": "https://github.com/walkerhughes"
+  },
+  "plugins": [
+    {
+      "name": "harbor-mcp",
+      "source": "./harbor-mcp",
+      "description": "Inspect Harbor hub evaluation jobs, trials, and uploads from Claude Code, and publish tasks, datasets, and job archives when writes are enabled."
+    }
+  ]
+}

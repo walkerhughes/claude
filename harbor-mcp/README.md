@@ -6,20 +6,39 @@ It wraps Harbor's own async client classes (`HubClient`, `UploadDB`, `RegistryDB
 
 This lives in the [`mcps`](../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
 
-## Setup
+## Install as a Claude Code plugin
+
+```
+/plugin marketplace add walkerhughes/mcps
+/plugin install harbor-mcp
+```
+
+Requires [`uv`](https://docs.astral.sh/uv/) on your PATH; the plugin builds its own environment from the checked-in `uv.lock` on first launch.
+
+Then run `/harbor-mcp:setup`, which checks your credentials and walks you through whichever path you need.
+
+## Credentials
+
+The server resolves a key from the first source that has one:
+
+| | Source | How |
+|---|--------|-----|
+| 1 | `HARBOR_API_KEY` in the environment | Export it in your shell |
+| 2 | `.env` in your project root | `HARBOR_API_KEY=sk-harbor-...` (searched in the working directory and up to three parents) |
+| 3 | `~/.harbor/credentials.json` | `harbor auth login` |
+
+So if you have already run `harbor auth login`, the plugin works with no configuration at all. A missing `.env` is normal, not an error. Nothing here ever writes your key back to disk or logs it, and `whoami` reports only the key *id* and its source.
+
+Verify with `whoami`. Restart the server after changing credentials.
+
+## Local development
 
 ```bash
 uv sync
 cp .env.example .env      # then set HARBOR_API_KEY
 ```
 
-Mint a key with `harbor auth login` (it stores one in `~/.harbor/credentials.json`) and put it in `.env`:
-
-```
-HARBOR_API_KEY=sk-harbor-...
-```
-
-The repo ships a [`.mcp.json`](.mcp.json) that Claude Code auto-discovers when started from this directory. It sources `.env` before launching, so your key never lives in the config. Verify the connection by asking the agent to call `whoami`.
+The same [`.mcp.json`](.mcp.json) serves both cases: it launches `uv run --project ${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
 
 ## Tools
 
@@ -44,7 +63,7 @@ Read tools work with any valid `HARBOR_API_KEY`. Write tools are gated (see belo
 
 ## Write gating
 
-Every write tool refuses unless `HARBOR_MCP_ENABLE_WRITES=true` in the server environment. `delete_job` additionally requires `confirm=true` per call, which the agent should pass only after you explicitly approve deleting a specific job. This keeps read-only use the safe default.
+Read-only is the default. Every write tool refuses unless `HARBOR_MCP_ENABLE_WRITES=true` in the server environment, which you set the same way as your key (shell export or `.env`), then restart the server. `delete_job` additionally requires `confirm=true` per call, which the agent should pass only after you explicitly approve deleting a specific job. This keeps read-only use the safe default.
 
 ## Testing
 

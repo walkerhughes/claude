@@ -2,8 +2,12 @@
   "mcpServers": {
     "harbor-hub": {
       "type": "stdio",
-      "command": "bash",
-      "args": ["-c", "set -a && source .env && set +a && exec uv run harbor-mcp"]
+      "command": "uv",
+      "args": ["run", "--project", "${CLAUDE_PLUGIN_ROOT:-.}", "harbor-mcp"],
+      "env": {
+        "HARBOR_API_KEY": "${HARBOR_API_KEY:-}",
+        "HARBOR_MCP_ENABLE_WRITES": "${HARBOR_MCP_ENABLE_WRITES:-}"
+      }
     }
   }
 }

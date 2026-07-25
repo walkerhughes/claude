@@ -1,14 +1,19 @@
-name: eval-safety
+name: harbor-mcp eval-safety
 
-# Runs only when the evals change: prove each eval is solvable by its oracle and
-# not trivially passable by a no-op agent. No LLM/Anthropic cost. This is NOT the
-# merge gate on the MCP capabilities (that is the `evals` job in ci.yml) -- it is
-# the safety net that keeps the evals themselves honest. Runs on modal, the same
-# provider the gate uses.
+# Runs only when harbor-mcp's evals change: prove each eval is solvable by its
+# oracle and not trivially passable by a no-op agent. No LLM/Anthropic cost.
+# This is NOT the merge gate on the MCP capabilities (that is the `evals` job)
+# -- it is the safety net that keeps the evals themselves honest. Runs on modal,
+# the same provider the gate uses.
 on:
   pull_request:
     paths:
-      - "evals/**"
+      - "harbor-mcp/evals/**"
+      - ".github/workflows/harbor-mcp-eval-safety.yml"
+
+defaults:
+  run:
+    working-directory: harbor-mcp
 
 jobs:
   eval-safety:

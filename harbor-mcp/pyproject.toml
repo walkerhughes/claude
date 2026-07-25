@@ -3,6 +3,9 @@ name = "harbor-mcp"
 version = "0.1.0"
 description = "MCP server for the Harbor hub: verify uploads, fetch job results, publish packages"
 readme = "README.md"
+# The LICENSE file lives at the monorepo root, outside this project directory,
+# so it is declared here but not bundled.
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     # Pinned exactly: we import harbor internals (hub, upload, publisher, db),
