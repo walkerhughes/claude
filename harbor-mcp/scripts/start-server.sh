@@ -42,6 +42,12 @@ if ! UV="$(find_uv)"; then
   exit 127
 fi
 
+# Drop any inherited VIRTUAL_ENV. uv already ignores a mismatched one, but it
+# warns loudly on stderr about "does not match the project environment path",
+# which reads like the cause of a failure and has already sent one debugging
+# session down the wrong path.
+unset VIRTUAL_ENV
+
 # First launch builds the environment from the checked-in uv.lock, which takes a
 # few seconds; later launches reuse it.
 exec "$UV" run --project "$ROOT" harbor-mcp
