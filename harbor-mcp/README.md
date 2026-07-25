@@ -8,37 +8,45 @@ This lives in the [`mcps`](../) monorepo, consolidated from a standalone repo wi
 
 ## Install as a Claude Code plugin
 
+Two separate commands. The first opens a prompt that expects only the `owner/repo`, so do not paste both lines at once:
+
 ```
 /plugin marketplace add walkerhughes/mcps
+```
+
+```
 /plugin install harbor-mcp
 ```
 
-Requires [`uv`](https://docs.astral.sh/uv/) on your PATH; the plugin builds its own environment from the checked-in `uv.lock` on first launch.
+Requires [`uv`](https://docs.astral.sh/uv/) on your PATH; the plugin builds its own environment from the checked-in `uv.lock` on first launch, which takes a few seconds before the tools appear.
 
-Then run `/harbor-mcp:setup`, which checks your credentials and walks you through whichever path you need.
+Then run `/harbor-mcp:setup`. It checks your credentials, walks you through login if needed, and summarizes what is currently in your account.
 
 ## Credentials
 
-The server resolves a key from the first source that has one:
+Authenticate once:
 
-| | Source | How |
-|---|--------|-----|
-| 1 | `HARBOR_API_KEY` in the environment | Export it in your shell |
-| 2 | `.env` in your project root | `HARBOR_API_KEY=sk-harbor-...` (searched in the working directory and up to three parents) |
-| 3 | `~/.harbor/credentials.json` | `harbor auth login` |
+```bash
+harbor auth login
+```
 
-So if you have already run `harbor auth login`, the plugin works with no configuration at all. A missing `.env` is normal, not an error. Nothing here ever writes your key back to disk or logs it, and `whoami` reports only the key *id* and its source.
+That mints a key scoped to the logged-in user and stores it in `~/.harbor/credentials.json`, which harbor reads on its own. The plugin needs no further configuration, and no key ever goes into a config file or a `.env`.
 
-Verify with `whoami`. Restart the server after changing credentials.
+You do not need a global harbor install: harbor ships inside the plugin's environment, so `uv run --project <plugin-dir> harbor auth login` works too, which is what `/harbor-mcp:setup` falls back to.
+
+`harbor auth status` shows what is stored, but it only reads that local file, so it still reports success for a key that has since been revoked. `whoami` is what confirms the credential is live; it returns the key *id* and source, never the key. Restart the server after changing credentials.
+
+`HARBOR_API_KEY` also works as an override, since harbor itself checks it first. That is for CI and scripting; interactively, prefer `harbor auth login` so the key stays scoped to you.
 
 ## Local development
 
 ```bash
 uv sync
-cp .env.example .env      # then set HARBOR_API_KEY
 ```
 
-The same [`.mcp.json`](.mcp.json) serves both cases: it launches `uv run --project ${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
+The same [`.mcp.json`](.mcp.json) serves both cases: it runs [`scripts/start-server.sh`](scripts/start-server.sh) at `${CLAUDE_PLUGIN_ROOT:-.}`, which resolves to the installed plugin directory when loaded as a plugin and to this directory when Claude Code is started from here.
+
+That wrapper exists for a reason worth knowing: naming `uv` directly as the command assumes it is on whatever PATH the MCP client spawns with, and it often is not. A Homebrew `uv` lives in `/opt/homebrew/bin`, which is missing from the minimal PATH some launch contexts provide, and the server then fails with an opaque JSON-RPC `-32000` and no explanation. The wrapper searches PATH plus the common install locations, resolves the plugin root from its own location, and prints an actionable message to stderr if `uv` genuinely is not installed.
 
 ## Tools
 
@@ -63,7 +71,7 @@ Read tools work with any valid `HARBOR_API_KEY`. Write tools are gated (see belo
 
 ## Write gating
 
-Read-only is the default. Every write tool refuses unless `HARBOR_MCP_ENABLE_WRITES=true` in the server environment, which you set the same way as your key (shell export or `.env`), then restart the server. `delete_job` additionally requires `confirm=true` per call, which the agent should pass only after you explicitly approve deleting a specific job. This keeps read-only use the safe default.
+Read-only is the default. Every write tool refuses unless `HARBOR_MCP_ENABLE_WRITES=true` in the server environment, so export it in your shell and restart the server. It is a local toggle, not a credential; the plugin passes it through explicitly. `delete_job` additionally requires `confirm=true` per call, which the agent should pass only after you explicitly approve deleting a specific job. This keeps read-only use the safe default.
 
 ## Testing
 

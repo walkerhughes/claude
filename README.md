@@ -9,14 +9,17 @@ A collection of [Model Context Protocol](https://modelcontextprotocol.io) server
 
 ## Install as a Claude Code plugin
 
-This repo is also a plugin marketplace:
+This repo is also a plugin marketplace. Run these as two separate commands, not as one paste: the first opens a prompt that expects only the `owner/repo`.
 
 ```
 /plugin marketplace add walkerhughes/mcps
+```
+
+```
 /plugin install harbor-mcp
 ```
 
-Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. See each server's README for credentials.
+Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. See each server's README for credentials.
 
 ## Design
 
