@@ -3,7 +3,7 @@
     "harbor-hub": {
       "type": "stdio",
       "command": "bash",
-      "args": ["${CLAUDE_PLUGIN_ROOT:-.}/scripts/start-server.sh"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/start-server.sh"]
     }
   }
 }
