@@ -20,7 +20,7 @@ Two separate commands. The first opens a prompt that expects only the `owner/rep
 
 Requires [`uv`](https://docs.astral.sh/uv/) on your PATH; the plugin builds its own environment from the checked-in `uv.lock` on first launch, which takes a few seconds before the tools appear.
 
-Then run `/harbor-mcp:setup`. It checks your credentials, walks you through login if needed, and summarizes what is currently in your account.
+If you have already run `harbor auth login`, that is the whole setup: the server reads `~/.harbor/credentials.json` on its own. Ask the agent to call `whoami` to confirm.
 
 ## Credentials
 
@@ -32,7 +32,9 @@ harbor auth login
 
 That mints a key scoped to the logged-in user and stores it in `~/.harbor/credentials.json`, which harbor reads on its own. The plugin needs no further configuration, and no key ever goes into a config file or a `.env`.
 
-You do not need a global harbor install: harbor ships inside the plugin's environment, so `uv run --project <plugin-dir> harbor auth login` works too, which is what `/harbor-mcp:setup` falls back to.
+You do not need a global harbor install: harbor ships inside the plugin's environment, so `uv run --project <plugin-dir> harbor auth login` works too.
+
+There is no setup skill. If a tool hits an authentication error, it returns the recovery steps (`harbor auth status`, then `login` or `logout`) in its `suggestions`, so the agent gets them exactly when they are needed and they cost nothing otherwise. The plugin's standing guidance lives in the MCP server's `instructions`, which Claude Code loads into every session. A `CLAUDE.md` at the plugin root would *not* work: the [plugins reference](https://code.claude.com/docs/en/plugins-reference) states it is not loaded as project context.
 
 `harbor auth status` shows what is stored, but it only reads that local file, so it still reports success for a key that has since been revoked. `whoami` is what confirms the credential is live; it returns the key *id* and source, never the key. Restart the server after changing credentials.
 

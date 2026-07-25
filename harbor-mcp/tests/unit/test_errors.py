@@ -31,7 +31,14 @@ async def test_guarded_tool_maps_auth_error_with_suggestions():
 
     payload = json.loads(await tool())
     assert "Not authenticated" in payload["error"]
-    assert any("HARBOR_API_KEY" in s for s in payload["suggestions"])
+    # The suggestions are the whole auth recovery procedure, since there is no
+    # setup skill: diagnose with `harbor auth status`, then login.
+    suggestions = " ".join(payload["suggestions"])
+    assert "harbor auth status" in suggestions
+    assert "harbor auth login" in suggestions
+    # Must not send anyone back to .env; the server stopped reading it, and a
+    # stale key there is what shadowed a good credentials.json once already.
+    assert ".env" not in suggestions
 
 
 async def test_guarded_tool_maps_postgrest_error():

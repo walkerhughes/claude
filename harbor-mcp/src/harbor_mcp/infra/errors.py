@@ -12,10 +12,18 @@ from storage3.exceptions import StorageApiError
 
 logger = logging.getLogger(__name__)
 
+# The whole auth recovery procedure lives here rather than in a skill: it costs
+# nothing until auth actually fails, which is the only moment it is useful.
 AUTH_SUGGESTIONS = [
-    "Set HARBOR_API_KEY in this repo's .env file (see .env.example).",
-    "Mint a key by running `harbor auth login` in a terminal.",
-    "Call the whoami tool to verify credentials once set.",
+    "Run `harbor auth status` in a terminal to see whether a credential is "
+    "stored. It exits 0 either way, so read its output, not its exit code.",
+    "If it reports `Not authenticated`, ask the user to run `harbor auth login` "
+    "themselves; it is an interactive OAuth flow and stores a key scoped to "
+    "them in ~/.harbor/credentials.json.",
+    "If it reports a logged-in user, the stored key is revoked or expired: ask "
+    "the user to run `harbor auth logout` and then `harbor auth login` again.",
+    "The server must be restarted to pick up new credentials. Then call whoami "
+    "to confirm.",
 ]
 
 
