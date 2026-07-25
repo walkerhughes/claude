@@ -50,34 +50,67 @@ for the full reasoning.
 - **Deterministic mock API** for tests and evals: [`tests/fixtures/mock_api/`](tests/fixtures/mock_api)
 - **Agent-loop evals** through Harbor: [`evals/`](evals)
 
-## Getting Started
+## Install as a Claude Code plugin
 
-### 1. Install dependencies
+Two separate commands. The first opens a prompt that expects only the `owner/repo`, so do not paste both lines at once:
+
+```
+/plugin marketplace add walkerhughes/claude
+```
+
+```
+/plugin install tastytrade-mcp
+```
+
+Requires [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, which takes a few seconds before the tools appear.
+
+## Credentials
+
+Unlike Harbor, TastyTrade has no `auth login` command, so this file is created by hand once. Getting the values is the involved part:
+
+1. Register an OAuth application in the TastyTrade developer portal. That yields a **client id** and a **client secret**.
+2. Complete the authorization flow for your account to obtain a **refresh token**. This server uses the refresh-token grant, so the refresh token is the long-lived credential; there is no username or password anywhere.
+
+Then write them to `~/.tastytrade-mcp/credentials.json`:
+
+```bash
+mkdir -p ~/.tastytrade-mcp && chmod 700 ~/.tastytrade-mcp
+touch ~/.tastytrade-mcp/credentials.json && chmod 600 ~/.tastytrade-mcp/credentials.json
+```
+
+```json
+{
+  "client_id": "...",
+  "client_secret": "...",
+  "refresh_token": "...",
+  "base_url": "api.tastyworks.com"
+}
+```
+
+`base_url` is optional and defaults to `api.tastyworks.com`.
+
+**The server refuses to load this file if it is readable by group or others**, and tells you to `chmod 600`. Together the secret and refresh token grant full account access, including order placement when trading is enabled.
+
+### Precedence
+
+| | Source |
+|---|--------|
+| 1 | `TT_CLIENT_ID`, `TT_SECRET`, `TT_REFRESH` in the environment, when **all three** are set |
+| 2 | `~/.tastytrade-mcp/credentials.json` |
+
+Whole-source, not per-field: a file `client_id` paired with an environment `refresh_token` would fail authentication in a way that looks like a revoked token rather than a misconfiguration. A *partially* set environment is a hard error rather than a silent fallthrough to the file, for the same reason.
+
+The environment path exists for CI and scripting. Interactively, use the file.
+
+## Trading gate
+
+Read tools work with any valid credentials. `place_order` refuses unless `TT_ENABLE_TRADING=true` is set in the server environment, and then still requires `confirm=true` on each call. Preview-only is the default; leave it that way unless you intend to place live orders.
+
+## Local development
 
 ```bash
 uv sync
 ```
-
-### 2. Configure credentials
-
-Copy `.env.example` to `.env` and fill in your TastyTrade API credentials:
-
-```bash
-cp .env.example .env
-```
-
-You'll need a registered OAuth client from TastyTrade. Set these values in `.env`:
-
-```
-TT_CLIENT_ID=<your client id>
-TT_SECRET=<your client secret>
-TT_REFRESH=<your refresh token>
-API_BASE_URL=api.tastyworks.com
-```
-
-### 3. Run with Claude Code
-
-The `.mcp.json` is already configured. Start Claude Code from the project directory and the TastyTrade MCP server will be available automatically.
 
 ## Example
 

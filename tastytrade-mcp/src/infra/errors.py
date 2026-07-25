@@ -13,6 +13,7 @@ from typing import Awaitable, Callable
 import httpx
 from pydantic import ValidationError
 
+from ..credentials import CredentialsError
 from .logging import get_logger
 
 
@@ -30,8 +31,12 @@ _HTTP_GUIDANCE: dict[int, tuple[str, list[str]]] = {
     401: (
         "Authentication failed.",
         [
-            "Verify TT_CLIENT_ID, TT_SECRET, and TT_REFRESH are set and current.",
-            "The refresh token may have been revoked, so re-authorize the OAuth client.",
+            "Credentials resolved but were rejected, so they are stale rather than "
+            "missing: the refresh token has most likely been revoked or expired.",
+            "They come from ~/.tastytrade-mcp/credentials.json, or from TT_CLIENT_ID, "
+            "TT_SECRET and TT_REFRESH when all three are set in the environment.",
+            "Ask the user to re-authorize the OAuth client and replace refresh_token "
+            "themselves. Never ask them to paste a secret into the chat.",
         ],
     ),
     403: (
@@ -118,8 +123,18 @@ def guarded_tool(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable
                 f"Network error contacting Tastytrade: {type(exc).__name__}.",
                 ["Check connectivity to the API host.", "Retry in a moment."],
             )
+        except CredentialsError as exc:
+            # The message already names the file, the JSON shape, and the
+            # environment alternative, so it is passed through verbatim.
+            get_logger().warning("credentials_error tool=%s", func.__name__)
+            return error_response(str(exc), ["See the tastytrade-mcp README for how to obtain each value."])
         except (KeyError, ValueError, TypeError) as exc:
             get_logger().warning("tool_value_error tool=%s err=%s", func.__name__, exc)
             return error_response(f"Could not process the request: {exc}", ["Re-check the arguments and retry."])
+        except Exception as exc:  # noqa: BLE001
+            # Last resort. Without this the docstring's promise is false: anything
+            # outside the cases above reaches the client as a raw traceback.
+            get_logger().exception("unexpected_error tool=%s", func.__name__)
+            return error_response(f"{type(exc).__name__}: {exc}")
 
     return wrapper

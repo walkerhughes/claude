@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - "harbor-mcp/**"
+      - "tastytrade-mcp/**"
       - ".github/workflows/plugin-version.yml"
 
 jobs:
@@ -23,26 +24,39 @@ jobs:
       - name: Require a version bump when plugin files change
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-          MANIFEST: harbor-mcp/.claude-plugin/plugin.json
         run: |
           set -euo pipefail
 
-          # Only the shipped plugin payload matters. Tests and evals are not
-          # copied into the plugin cache, so changing them cannot strand a user.
-          if ! git diff --name-only "$BASE"...HEAD -- harbor-mcp \
-               ':(exclude)harbor-mcp/tests/**' \
-               ':(exclude)harbor-mcp/evals/**' | grep -q .; then
-            echo "No shipped plugin files changed; version bump not required."
-            exit 0
-          fi
-
           read_version() { python3 -c "import json,sys;print(json.load(sys.stdin)['version'])"; }
-          base_version="$(git show "$BASE:$MANIFEST" | read_version)"
-          head_version="$(read_version < "$MANIFEST")"
+          status=0
 
-          echo "base=$base_version head=$head_version"
-          if [ "$base_version" = "$head_version" ]; then
-            echo "::error file=$MANIFEST::Shipped plugin files changed but version is still $head_version. Bump it, or installed copies will never pick this up."
-            exit 1
-          fi
-          echo "Version bumped $base_version -> $head_version."
+          # Discovered rather than listed, so a newly added plugin is gated
+          # without editing this workflow.
+          for manifest in */.claude-plugin/plugin.json; do
+            plugin="${manifest%%/*}"
+
+            # Only the shipped payload matters. Tests and evals are not copied
+            # into the plugin cache, so changing them cannot strand a user.
+            if ! git diff --name-only "$BASE"...HEAD -- "$plugin" \
+                 ":(exclude)$plugin/tests/**" \
+                 ":(exclude)$plugin/evals/**" | grep -q .; then
+              echo "$plugin: no shipped files changed, version bump not required."
+              continue
+            fi
+
+            head_version="$(read_version < "$manifest")"
+            if ! git cat-file -e "$BASE:$manifest" 2>/dev/null; then
+              echo "$plugin: new plugin at $head_version, nothing to compare against."
+              continue
+            fi
+            base_version="$(git show "$BASE:$manifest" | read_version)"
+
+            if [ "$base_version" = "$head_version" ]; then
+              echo "::error file=$manifest::Shipped files in $plugin changed but version is still $head_version. Bump it, or installed copies will never pick this up."
+              status=1
+            else
+              echo "$plugin: version bumped $base_version -> $head_version."
+            fi
+          done
+
+          exit "$status"
