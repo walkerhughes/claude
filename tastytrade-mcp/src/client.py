@@ -1,11 +1,11 @@
 """TastyTrade API client with OAuth2 authentication."""
 
 import asyncio
-import os
 import time
 
 import httpx
 
+from .credentials import DEFAULT_BASE_URL, resolve_credentials
 from .infra.logging import get_logger
 
 
@@ -24,13 +24,22 @@ class TastyTradeClient:
         refresh_token: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        base = base_url or os.environ.get("API_BASE_URL", "api.tastyworks.com")
+        # Tests pass all three explicitly, so credentials are only resolved when
+        # something is missing. That keeps the mock-API suite from needing a
+        # credentials file or environment at all.
+        if client_id and client_secret and refresh_token:
+            resolved = None
+        else:
+            resolved = resolve_credentials()
+
+        base = base_url or (resolved.base_url if resolved else None) or DEFAULT_BASE_URL
         if not base.startswith("http"):
             base = f"https://{base}"
         self.base_url = base
-        self._client_id = client_id or os.environ["TT_CLIENT_ID"]
-        self._client_secret = client_secret or os.environ["TT_SECRET"]
-        self._refresh_token = refresh_token or os.environ["TT_REFRESH"]
+        self._client_id = client_id or (resolved.client_id if resolved else "")
+        self._client_secret = client_secret or (resolved.client_secret if resolved else "")
+        self._refresh_token = refresh_token or (resolved.refresh_token if resolved else "")
+        self.credential_source = resolved.source if resolved else "explicit"
         self._access_token: str | None = None
         self._token_expires_at: float = 0
         self.customer_id: str | None = None
