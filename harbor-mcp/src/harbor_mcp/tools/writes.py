@@ -61,7 +61,10 @@ def _writes_disabled() -> str | None:
         return None
     return error_response(
         "Write tools are disabled.",
-        suggestions=["Set HARBOR_MCP_ENABLE_WRITES=true in .env to enable hub writes."],
+        suggestions=[
+            "Ask the user to export HARBOR_MCP_ENABLE_WRITES=true and restart "
+            "the server. Read-only is the intended default."
+        ],
     )
 
 

@@ -1,5 +1,6 @@
 {
   "name": "walkerhughes-mcps",
+  "description": "MCP servers that give agents direct access to external services: the Harbor evaluation hub, with more to come.",
   "owner": {
     "name": "Walker Hughes",
     "url": "https://github.com/walkerhughes"
