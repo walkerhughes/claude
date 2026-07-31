@@ -1,4 +1,4 @@
-name: harbor-mcp
+name: harbor-hub
 
 # GitHub Actions only reads workflows from the repository root, so every job
 # here sets working-directory to the server's subdirectory. The paths filters
@@ -6,17 +6,17 @@ name: harbor-mcp
 on:
   pull_request:
     paths:
-      - "harbor-mcp/**"
-      - ".github/workflows/harbor-mcp.yml"
+      - "plugins/harbor-hub/**"
+      - ".github/workflows/harbor-hub.yml"
   push:
     branches: [main]
     paths:
-      - "harbor-mcp/**"
-      - ".github/workflows/harbor-mcp.yml"
+      - "plugins/harbor-hub/**"
+      - ".github/workflows/harbor-hub.yml"
 
 defaults:
   run:
-    working-directory: harbor-mcp
+    working-directory: plugins/harbor-hub
 
 jobs:
   lint-unit:

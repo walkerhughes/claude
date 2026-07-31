@@ -9,8 +9,7 @@ name: plugin version
 on:
   pull_request:
     paths:
-      - "harbor-mcp/**"
-      - "tastytrade-mcp/**"
+      - "plugins/**"
       - ".github/workflows/plugin-version.yml"
 
 jobs:
@@ -32,8 +31,8 @@ jobs:
 
           # Discovered rather than listed, so a newly added plugin is gated
           # without editing this workflow.
-          for manifest in */.claude-plugin/plugin.json; do
-            plugin="${manifest%%/*}"
+          for manifest in plugins/*/.claude-plugin/plugin.json; do
+            plugin="${manifest%/.claude-plugin/plugin.json}"
 
             # Only the shipped payload matters. Tests and evals are not copied
             # into the plugin cache, so changing them cannot strand a user.

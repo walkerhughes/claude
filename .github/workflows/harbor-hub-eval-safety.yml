@@ -1,4 +1,4 @@
-name: harbor-mcp eval-safety
+name: harbor-hub eval-safety
 
 # Runs only when harbor-mcp's evals change: prove each eval is solvable by its
 # oracle and not trivially passable by a no-op agent. No LLM/Anthropic cost.
@@ -8,12 +8,12 @@ name: harbor-mcp eval-safety
 on:
   pull_request:
     paths:
-      - "harbor-mcp/evals/**"
-      - ".github/workflows/harbor-mcp-eval-safety.yml"
+      - "plugins/harbor-hub/evals/**"
+      - ".github/workflows/harbor-hub-eval-safety.yml"
 
 defaults:
   run:
-    working-directory: harbor-mcp
+    working-directory: plugins/harbor-hub
 
 jobs:
   eval-safety:
