@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #   RUN /opt/harbor-mcp/bin/pip install --no-cache-dir /opt/harbor-mcp-src
 RUN python -m venv /opt/harbor-mcp \
     && /opt/harbor-mcp/bin/pip install --no-cache-dir \
-        "harbor-mcp @ git+https://github.com/walkerhughes/harbor-mcp.git" \
+        "harbor-mcp @ git+https://github.com/walkerhughes/claude.git#subdirectory=plugins/harbor-hub" \
     && ln -s /opt/harbor-mcp/bin/harbor-mcp /usr/local/bin/harbor-mcp \
     && ln -s /opt/harbor-mcp/bin/harbor /usr/local/bin/harbor
 

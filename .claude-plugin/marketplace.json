@@ -7,13 +7,13 @@
   },
   "plugins": [
     {
-      "name": "harbor-mcp",
-      "source": "./harbor-mcp",
+      "name": "harbor-hub",
+      "source": "./plugins/harbor-hub",
       "description": "Inspect Harbor hub evaluation jobs, trials, and uploads from Claude Code, and publish tasks, datasets, and job archives when writes are enabled."
     },
     {
-      "name": "tastytrade-mcp",
-      "source": "./tastytrade-mcp",
+      "name": "tastytrade",
+      "source": "./plugins/tastytrade",
       "description": "Inspect TastyTrade brokerage accounts, positions, market data, option chains, and transactions from Claude Code. Order placement is gated off by default."
     }
   ]

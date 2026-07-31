@@ -1,4 +1,4 @@
-name: tastytrade-mcp
+name: tastytrade
 
 # GitHub Actions only reads workflows from the repository root, so every job
 # here sets working-directory to the server's subdirectory. The paths filters
@@ -6,17 +6,17 @@ name: tastytrade-mcp
 on:
   pull_request:
     paths:
-      - "tastytrade-mcp/**"
-      - ".github/workflows/tastytrade-mcp.yml"
+      - "plugins/tastytrade/**"
+      - ".github/workflows/tastytrade.yml"
   push:
     branches: [main]
     paths:
-      - "tastytrade-mcp/**"
-      - ".github/workflows/tastytrade-mcp.yml"
+      - "plugins/tastytrade/**"
+      - ".github/workflows/tastytrade.yml"
 
 defaults:
   run:
-    working-directory: tastytrade-mcp
+    working-directory: plugins/tastytrade
 
 jobs:
   check:

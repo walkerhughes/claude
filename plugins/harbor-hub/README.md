@@ -1,10 +1,10 @@
-# harbor-mcp
+# harbor-hub
 
 An [MCP](https://modelcontextprotocol.io) server for the [Harbor](https://www.harborframework.com) hub. It exposes your evaluation jobs, trials, uploads, and published packages as tools an agent (Claude Code, etc.) can call directly, so you can ask "did my upload work?" or "what was the mean reward on job X?" without leaving the chat.
 
 It wraps Harbor's own async client classes (`HubClient`, `UploadDB`, `RegistryDB`, `Uploader`, `Downloader`, `Publisher`), so there is no separate API layer to maintain. Harbor reads `HARBOR_API_KEY` and handles token exchange itself.
 
-This lives in the [`claude`](../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
+This lives in the [`claude`](../../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
 
 ## Install as a Claude Code plugin
 
@@ -15,7 +15,7 @@ Two separate commands. The first opens a prompt that expects only the `owner/rep
 ```
 
 ```
-/plugin install harbor-mcp
+/plugin install harbor-hub
 ```
 
 Requires [`uv`](https://docs.astral.sh/uv/) on your PATH; the plugin builds its own environment from the checked-in `uv.lock` on first launch, which takes a few seconds before the tools appear.

@@ -10,8 +10,8 @@ Formerly `walkerhughes/mcps`, back when it only held MCP servers.
 
 | Server | What it connects to | Plugin |
 |--------|---------------------|--------|
-| [`harbor-mcp`](harbor-mcp/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. | yes |
-| [`tastytrade-mcp`](tastytrade-mcp/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). | not yet |
+| [`harbor-hub`](plugins/harbor-hub/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. | yes |
+| [`tastytrade`](plugins/tastytrade/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). | not yet |
 
 They follow Honeycomb's [MCP, easy as 1-2-3](https://www.honeycomb.io/blog/mcp-easy-as-1-2-3) guidance: a few curated tools built around real questions rather than raw API endpoints, responses shaped for a model instead of a UI, and typed schemas that steer the model toward valid calls.
 
@@ -24,13 +24,13 @@ Run these as two separate commands, not as one paste: the first opens a prompt t
 ```
 
 ```
-/plugin install harbor-mcp
+/plugin install harbor-hub
 ```
 
 The non-interactive equivalents are more reliable, and are the only way to move an existing install to a new version, since `claude plugin install` no-ops when the plugin is already present:
 
 ```bash
-claude plugin marketplace update walkerhughes && claude plugin update harbor-mcp@walkerhughes
+claude plugin marketplace update walkerhughes && claude plugin update harbor-hub@walkerhughes
 ```
 
 Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. A plugin update needs a Claude Code restart, not just an `/mcp` reconnect. See each server's README for credentials.
@@ -43,9 +43,12 @@ Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launc
 
 ```
 claude/
-├── .claude-plugin/       # marketplace manifest
-├── harbor-mcp/
-└── tastytrade-mcp/
+├── .claude-plugin/          # marketplace manifest
+└── plugins/
+    ├── harbor-hub/
+    └── tastytrade/
 ```
 
-Each subdirectory is self-contained: its own `README.md` covers install, credentials, tests, and tools. CI runs per subdirectory via `paths` filters, so a change to one never runs another's suite.
+Plugins live under `plugins/`, one directory each, named for the platform they talk to rather than for being an MCP server. Skills and other components get their own top-level directories as they arrive.
+
+Each plugin directory is self-contained: its own `README.md` covers install, credentials, tests, and tools. CI runs per subdirectory via `paths` filters, so a change to one never runs another's suite.
