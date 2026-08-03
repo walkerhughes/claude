@@ -19,11 +19,11 @@ reads and writes against the hub. Every task directory in `evals/` is an eval:
 the runners execute them all with a single `harbor run -p evals/`, in parallel,
 so nothing else may live here as a task directory.
 
-| Eval | Bucket | The agent must (via the MCP) | Answer in `/app/answer.txt` |
-| --- | --- | --- | --- |
-| `read-job` | job reads | report the mean reward of job `$EVAL_READ_JOB_ID` | a plain decimal, e.g. `1.0` |
-| `delete-job` | job writes | delete job `$EVAL_DELETE_JOB_ID` (writes enabled; confirm-gated) | `deleted` |
-| `check-published-task` | registry reads | decide whether `$EVAL_TASK_REF` is published | `yes` or `no` |
+| Eval | Bucket | The agent must (via the MCP) | Required MCP tool | Answer in `/app/answer.txt` |
+| --- | --- | --- | --- | --- |
+| `read-job` | job reads | report the mean reward of job `$EVAL_READ_JOB_ID` | `get_job_overview` | a plain decimal, e.g. `1.0` |
+| `delete-job` | job writes | delete job `$EVAL_DELETE_JOB_ID` (writes enabled; confirm-gated) | `delete_job` | `deleted` |
+| `check-published-task` | registry reads | decide whether `$EVAL_TASK_REF` is published | `check_task_published` | `yes` or `no` |
 
 `read-job` and `delete-job` take separate seeded jobs so the parallel run has
 no read/delete race. `delete-job` enables the MCP write tools for itself via
@@ -34,6 +34,44 @@ Deliberately **out of scope** for a per-PR gate: `publish_task` /
 `publish_dataset` (published versions are immutable/content-addressed, not
 cleanly reversible) and `set_job_visibility` / `share_job` (niche).
 
+## Two rewards: `outcome` and `process`
+
+Each eval scores two rewards, both computed by
+[rewardkit](https://harborframework.com/docs/rewardkit) (baked into the image,
+so verification needs no network of its own; `tests/test.sh` is just
+`rewardkit /tests`). rewardkit's nested layout gives one reward per
+subdirectory of `tests/`:
+
+| Reward | `tests/` dir | Grades |
+| --- | --- | --- |
+| `outcome` | `outcome/check.py` | the answer, against ground truth recomputed live from the hub |
+| `process` | `process/check.py` | that the answer came **through the harbor-hub MCP server** |
+
+`outcome` on its own cannot gate the MCP. The `harbor` CLI is on PATH in the
+eval image (the oracle and the verifiers both need it), so an agent that never
+touches the MCP -- or one that calls it, gets an error, and quietly falls back
+to the CLI -- still produces a correct answer and still scores 1.0. That
+fallback is exactly the regression these evals exist to catch, so `process`
+grades the agent's ATIF trajectory at `/logs/agent/trajectory.json`:
+
+- `criteria.trajectory_tool_used("mcp__harbor-hub__<tool>")` -- the eval's
+  required tool was actually called. Claude Code names MCP tools
+  `mcp__<server>__<tool>`, where `<server>` is the
+  `[[environment.mcp_servers]]` name from `task.toml`. Each `instruction.md`
+  names exactly one required tool so this can be an exact match.
+- `no_harbor_cli` (local `@criterion`) -- no `Bash` tool call in the trajectory
+  invoked the `harbor` CLI. `trajectory_tool_not_used("Bash")` would be wrong
+  here: the agent legitimately needs Bash to read `$EVAL_*` and write the
+  answer.
+
+Both trajectory criteria **fail closed**: a missing or unreadable trajectory
+scores 0, never a silent pass.
+
+> Gotcha, if you add more trajectory criteria: rewardkit's built-ins default to
+> `path="/logs/trajectory.json"`, but Harbor agents write
+> `/logs/agent/trajectory.json`. The wrong path is not an error -- the file is
+> just missing and the criterion returns 0. Always pass `path` explicitly.
+
 ## Self-truthing verifiers
 
 Verifiers do not rely on planted expected values. `HARBOR_API_KEY` is threaded
@@ -41,7 +79,7 @@ into each verifier through `[verifier.env]` (`${HARBOR_API_KEY:-}`, resolved
 from the host at `harbor run` time), so every `tests/test.sh` recomputes the
 ground truth live from the hub with the `harbor` CLI and compares:
 
-| Eval | How the verifier self-truths |
+| Eval | How the `outcome` reward self-truths |
 | --- | --- |
 | `read-job` | `harbor hub job show $EVAL_READ_JOB_ID --json` -> `.stats.avg_reward`, matched within 1e-6 |
 | `delete-job` | `harbor hub job show $EVAL_DELETE_JOB_ID --json` must be empty (job gone) |
@@ -87,7 +125,12 @@ make eval-safety    # oracle must pass, nop must fail -- no LLM cost
 twice: once with the `oracle` agent (every eval must reach reward 1.0 -- the
 evals are solvable) and once with the `nop` agent, which produces no answer
 (every eval must score 0 -- the evals are not trivially passable). Each agent
-gets its own seeded job pair; all seeds are dropped afterward. This runs in CI
+gets its own seeded job pair; all seeds are dropped afterward.
+
+The oracle is gated on `outcome` only (`check_reward.py --only outcome`). It is
+a shell script, not an agent: it leaves no trajectory and cannot call MCP tools,
+so `process` is not oracle-solvable by construction. The nop agent is gated on
+both rewards, which is strictly stronger. This runs in CI
 via [`eval-safety.yml`](../.github/workflows/eval-safety.yml) on every PR that
 touches `evals/**`, so the evals stay honest independently of the merge gate.
 

@@ -11,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install harbor-mcp into a DEDICATED VENV, not system site-packages, and put
-# its entrypoints (harbor-mcp for the stdio MCP server declared in task.toml,
-# harbor for the oracle/verifier CLI calls) on PATH via symlinks.
+# Install harbor-mcp and harbor-rewardkit into a DEDICATED VENV, not system
+# site-packages, and put their entrypoints on PATH via symlinks: harbor-mcp for
+# the stdio MCP server declared in task.toml, harbor for the oracle/verifier CLI
+# calls, rewardkit for the verifiers (tests/test.sh). rewardkit is baked in
+# rather than fetched with uvx so verification needs no network of its own.
 #
 # The venv is load-bearing for modal: modal's image builder appends its own
 # pinned client-dependency install into the system interpreter of every image
@@ -32,7 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/harbor-mcp \
     && /opt/harbor-mcp/bin/pip install --no-cache-dir \
         "harbor-mcp @ git+https://github.com/walkerhughes/claude.git#subdirectory=plugins/harbor-hub" \
+        "harbor-rewardkit==0.1.*" \
     && ln -s /opt/harbor-mcp/bin/harbor-mcp /usr/local/bin/harbor-mcp \
-    && ln -s /opt/harbor-mcp/bin/harbor /usr/local/bin/harbor
+    && ln -s /opt/harbor-mcp/bin/harbor /usr/local/bin/harbor \
+    && ln -s /opt/harbor-mcp/bin/rewardkit /usr/local/bin/rewardkit
 
 WORKDIR /app

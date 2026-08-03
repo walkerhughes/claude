@@ -1,0 +1,57 @@
+"""`process` reward: the answer came through the harbor-hub MCP server.
+
+The `outcome` reward only sees /app/answer.txt, and the harbor CLI is on PATH
+in this image (the oracle and the verifier both need it). So an agent that
+never touches the MCP -- or one that calls it, gets a broken response, and
+quietly falls back to `harbor hub job show` -- still produces a correct answer.
+That is exactly the regression this eval exists to catch, so grade the
+trajectory too.
+
+Claude Code names MCP tools `mcp__<server>__<tool>`; `<server>` is the
+`[[environment.mcp_servers]]` name from task.toml, written verbatim into the
+agent's config. The instruction names one required tool so this can be an exact
+match instead of a set.
+
+`path` is not optional: rewardkit's trajectory criteria default to
+/logs/trajectory.json, Harbor agents write /logs/agent/trajectory.json, and a
+missing file scores 0 silently rather than erroring.
+"""
+
+import json
+import re
+from pathlib import Path
+
+from rewardkit import criteria, criterion
+
+TRAJECTORY = "/logs/agent/trajectory.json"
+
+# `harbor` as the start of a command, so `harbor-mcp` / `harbor-hub` and paths
+# like /usr/local/bin/harbor are handled correctly (the latter is a real call).
+_HARBOR_CLI = re.compile(r"(?<![\w-])harbor\s")
+
+
+@criterion(description="Agent did not shell out to the harbor CLI")
+def no_harbor_cli(workspace: Path) -> bool:
+    """False if any Bash tool call in the trajectory invoked the harbor CLI.
+
+    Fails closed: no trajectory means no evidence the MCP path was used. That
+    is why the oracle and nop agents score 0 on `process` -- neither is an
+    agent that can call MCP tools. See evals/README.md.
+    """
+    try:
+        data = json.loads(Path(TRAJECTORY).read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+
+    for step in data.get("steps") or []:
+        for call in step.get("tool_calls") or []:
+            if call.get("function_name") != "Bash":
+                continue
+            command = (call.get("arguments") or {}).get("command") or ""
+            if _HARBOR_CLI.search(str(command)):
+                return False
+    return True
+
+
+criteria.trajectory_tool_used("mcp__harbor-hub__get_job_overview", path=TRAJECTORY)
+criteria.no_harbor_cli()

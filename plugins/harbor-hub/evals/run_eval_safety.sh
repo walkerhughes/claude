@@ -4,6 +4,12 @@
 # reward 0 on every eval. This proves each eval is solvable and not trivially
 # passable -- run it whenever the evals change. No LLM/Anthropic cost.
 #
+# The oracle is gated on the `outcome` reward only (`--only outcome`). Each
+# eval also carries a `process` reward for having gone through the harbor-hub
+# MCP server, and the oracle is a shell script rather than an agent: it leaves
+# no trajectory and cannot call MCP tools, so `process` is not oracle-solvable
+# by construction. The nop agent is gated on both, which is strictly stronger.
+#
 # Mirrors the gate runner's shape: each agent gets its own pair of freshly
 # seeded hub jobs (one to read, one to delete -- no parallel read/delete race),
 # then a single `harbor run -p evals/` executes every eval in parallel. All
@@ -81,11 +87,12 @@ show_verifier_output() {
     cat "$JOBS_DIR/$agent/safety-$agent"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
 }
 
-# The oracle must solve every eval: the evals are solvable.
+# The oracle must solve every eval: the evals are solvable. Outcome only --
+# see the note at the top on why `process` is not oracle-solvable.
 run_all oracle
 python3 "$REPO_ROOT/evals/check_reward.py" \
-    "$JOBS_DIR/oracle/safety-oracle/result.json" safety-oracle \
-    || { show_verifier_output oracle; die "the ORACLE did not reach reward 1.0 on every eval (an eval is broken)"; }
+    "$JOBS_DIR/oracle/safety-oracle/result.json" safety-oracle --only outcome \
+    || { show_verifier_output oracle; die "the ORACLE did not reach outcome reward 1.0 on every eval (an eval is broken)"; }
 
 # The nop agent must fail every eval: the evals are not trivially passable.
 run_all nop
@@ -93,4 +100,4 @@ python3 "$REPO_ROOT/evals/check_reward.py" \
     "$JOBS_DIR/nop/safety-nop/result.json" safety-nop --expect-zero \
     || { show_verifier_output nop; die "the NOP agent scored above 0 on an eval (an eval is trivially passable)"; }
 
-echo "==> Eval-safety passed: oracle solved every eval; nop failed every eval."
+echo "==> Eval-safety passed: oracle solved every eval (outcome); nop failed every eval."

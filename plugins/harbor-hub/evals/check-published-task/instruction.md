@@ -9,9 +9,11 @@ variable (read it with `echo $EVAL_TASK_REF`). It has the form
 
 Your task:
 
-1. Use the `harbor-hub` MCP tools (not the raw hub API and not the `harbor`
-   CLI) to determine whether the task package `$EVAL_TASK_REF` exists on the
-   Harbor hub.
+1. Call the `harbor-hub` MCP tool `check_task_published` to determine whether
+   the task package `$EVAL_TASK_REF` exists on the Harbor hub. This is
+   required: you are graded on having called it, and shelling out to the
+   `harbor` CLI scores zero even if your answer is right. Do not use the raw
+   hub API either.
 2. Write your answer to `/app/answer.txt` as exactly one line:
    - `yes` if the package is published, or
    - `no` if it is not.

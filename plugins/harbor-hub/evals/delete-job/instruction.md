@@ -9,9 +9,11 @@ variable (read it with `echo $EVAL_DELETE_JOB_ID`).
 
 Your task:
 
-1. Use the `harbor-hub` MCP tools (not the raw hub API and not the `harbor`
-   CLI) to permanently delete the job with id `$EVAL_DELETE_JOB_ID` from the hub. The
-   delete tool requires an explicit confirmation flag.
+1. Call the `harbor-hub` MCP tool `delete_job` to permanently delete the job
+   with id `$EVAL_DELETE_JOB_ID` from the hub; it requires an explicit
+   confirmation flag. This is required: you are graded on having called it,
+   and shelling out to the `harbor` CLI scores zero even if the job ends up
+   deleted. Do not use the raw hub API either.
 2. After the job is deleted, write exactly one line, `deleted`, to
    `/app/answer.txt`.
 

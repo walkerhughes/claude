@@ -9,11 +9,13 @@ The job id to inspect is provided in the `EVAL_READ_JOB_ID` environment variable
 
 Your task:
 
-1. Use the `harbor-hub` MCP tools (not the raw hub API and not the `harbor`
-   CLI) to look up the job with id `$EVAL_READ_JOB_ID` on the Harbor hub.
-2. Determine the job's mean reward across its trials. Prefer the aggregate mean
-   reward reported by the job overview; only compute it yourself from per-trial
-   rewards if no aggregate is reported.
+1. Call the `harbor-hub` MCP tool `get_job_overview` on the job with id
+   `$EVAL_READ_JOB_ID`. This is required: you are graded on having called it,
+   and shelling out to the `harbor` CLI scores zero even if your answer is
+   right. Do not use the raw hub API either.
+2. Read the job's mean reward across its trials from that overview's aggregate.
+   Other `harbor-hub` tools (`whoami`, `get_job_trials`, `get_trial_detail`)
+   are available if you need them.
 3. Write the mean reward to `/app/answer.txt` as exactly one line containing a
    plain decimal number, for example `0.75` or `1.0` or `0`.
 
