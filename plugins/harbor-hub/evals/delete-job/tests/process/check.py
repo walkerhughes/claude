@@ -7,10 +7,16 @@ falls back to `harbor hub job delete` -- still leaves the job deleted.
 That is exactly the regression this eval exists to catch, so grade the
 trajectory too.
 
+The instruction deliberately does NOT name the tool. Naming it would test the
+agent's reading comprehension, not the plugin: the whole point of the plugin is
+that its tool descriptions and server instructions do the routing, so the
+caller does not have to. If a run fails here, the bug is upstream in the tool
+description or the server instructions, not in this eval -- fix it there rather
+than hinting in instruction.md.
+
 Claude Code names MCP tools `mcp__<server>__<tool>`; `<server>` is the
 `[[environment.mcp_servers]]` name from task.toml, written verbatim into the
-agent's config. The instruction names one required tool so this can be an exact
-match instead of a set.
+agent's config.
 
 `path` is not optional: rewardkit's trajectory criteria default to
 /logs/trajectory.json, Harbor agents write /logs/agent/trajectory.json, and a

@@ -38,9 +38,14 @@ def _task_entry(row: dict[str, Any]) -> dict[str, Any] | None:
 
 @guarded_tool
 async def check_task_published(org: str, name: str, ref: str = "latest") -> str:
-    """Check whether a task package version exists in the Harbor registry.
-    `ref` accepts a tag (e.g. "latest"), a numeric revision, or a sha256
-    digest. A missing version returns published=false rather than an error.
+    """Check whether a task package version is published in the Harbor registry.
+
+    A task reference written `org/name@ref` splits directly into these
+    arguments: "hello-world/hello-world@1" is org="hello-world",
+    name="hello-world", ref="1". `ref` accepts a tag (e.g. "latest"), a numeric
+    revision, or a sha256 digest. A missing version returns published=false
+    rather than an error, and that answer is authoritative -- there is no need
+    to confirm it by downloading the package or probing the hub another way.
     For dataset packages, use resolve_dataset instead."""
     try:
         resolved = await _registry().resolve_task_version(org, name, ref)

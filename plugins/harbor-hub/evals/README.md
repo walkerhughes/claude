@@ -19,11 +19,14 @@ reads and writes against the hub. Every task directory in `evals/` is an eval:
 the runners execute them all with a single `harbor run -p evals/`, in parallel,
 so nothing else may live here as a task directory.
 
-| Eval | Bucket | The agent must (via the MCP) | Required MCP tool | Answer in `/app/answer.txt` |
+| Eval | Bucket | The agent must | Expected tool | Answer in `/app/answer.txt` |
 | --- | --- | --- | --- | --- |
 | `read-job` | job reads | report the mean reward of job `$EVAL_READ_JOB_ID` | `get_job_overview` | a plain decimal, e.g. `1.0` |
 | `delete-job` | job writes | delete job `$EVAL_DELETE_JOB_ID` (writes enabled; confirm-gated) | `delete_job` | `deleted` |
 | `check-published-task` | registry reads | decide whether `$EVAL_TASK_REF` is published | `check_task_published` | `yes` or `no` |
+
+The "expected tool" column is what the `process` reward asserts. It is
+**not** in `instruction.md` -- see below.
 
 `read-job` and `delete-job` take separate seeded jobs so the parallel run has
 no read/delete race. `delete-job` enables the MCP write tools for itself via
@@ -55,10 +58,9 @@ fallback is exactly the regression these evals exist to catch, so `process`
 grades the agent's ATIF trajectory at `/logs/agent/trajectory.json`:
 
 - `criteria.trajectory_tool_used("mcp__harbor-hub__<tool>")` -- the eval's
-  required tool was actually called. Claude Code names MCP tools
+  expected tool was actually called. Claude Code names MCP tools
   `mcp__<server>__<tool>`, where `<server>` is the
-  `[[environment.mcp_servers]]` name from `task.toml`. Each `instruction.md`
-  names exactly one required tool so this can be an exact match.
+  `[[environment.mcp_servers]]` name from `task.toml`.
 - `no_harbor_cli` (local `@criterion`) -- no `Bash` tool call in the trajectory
   invoked the `harbor` CLI. `trajectory_tool_not_used("Bash")` would be wrong
   here: the agent legitimately needs Bash to read `$EVAL_*` and write the
@@ -71,6 +73,36 @@ scores 0, never a silent pass.
 > `path="/logs/trajectory.json"`, but Harbor agents write
 > `/logs/agent/trajectory.json`. The wrong path is not an error -- the file is
 > just missing and the criterion returns 0. Always pass `path` explicitly.
+
+## The instructions must not name the tool
+
+Each `instruction.md` states the **intent** and the answer format, and stops
+there. It does not name the tool to call, does not enumerate the server's
+tools, and does not say "don't use the `harbor` CLI".
+
+That is the whole point. The plugin exists to offload tool selection from the
+caller onto the agent, so an instruction that names the tool tests reading
+comprehension and proves nothing about the plugin. The `process` reward asserts
+the behaviour; making that behaviour happen is the plugin's job.
+
+So when an eval fails on `process`, the fix is upstream, in this order:
+
+1. **The tool description** (`src/harbor_mcp/tools/*.py` docstrings). Does it
+   say when to reach for this tool rather than a neighbouring one? `read-job`
+   is the sharp case: `list_jobs`, `get_job_overview`, and `get_job_trials` all
+   surface a reward, so `get_job_overview` has to say that its `reward` is the
+   already-aggregated mean and that averaging `get_job_trials` yourself is the
+   wrong move.
+2. **The server instructions** (`INSTRUCTIONS` in `src/harbor_mcp/server.py`),
+   which carry the cross-tool routing and the convention that these tools are
+   preferred over shelling out to the `harbor` CLI.
+3. Only then, the eval -- and only if the intent genuinely reads ambiguously.
+
+Supplying something the tool's own contract requires is not a hint:
+`delete-job` says "treat this instruction as the user's explicit approval to
+delete this specific job" because `delete_job` refuses without approval, by
+design. That is the eval standing in for the user, not telling the agent which
+tool to call.
 
 ## Self-truthing verifiers
 
