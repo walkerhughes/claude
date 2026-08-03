@@ -5,85 +5,48 @@ description: Break the code under test to confirm a test can actually fail, and 
 
 # Prove the test fails
 
-A test you just wrote is not verified until you have watched it fail for the right reason.
-A green run tells you the assertions did not raise. It does not tell you they could.
+A test is not evidence until it has been observed failing for the reason it exists. A green
+run says the assertions did not raise; it does not say they could. So break the thing the
+test guards, and watch what happens.
 
-Nothing below depends on a language or a runner. `go test`, pytest, Jest, Vitest, XCTest,
-RSpec and `cargo test` all report the same two things: which cases ran, and which failed.
-
-## When to run this
-
-- A test you just wrote or just refactored, before moving on.
-- A test that has never been observed failing, including one inherited green from CI.
-- Any suite described as guarding a contract, an invariant, or two implementations of one
-  interface agreeing. These are the ones that go vacuous quietly, because the assertion is
-  about shape rather than content.
-- Before reporting "the tests pass" as evidence that a change works.
-
-An assertion that compares derived collections is the highest-risk shape: sets of types,
-sorted key lists, lengths, non-null checks. Two empty results satisfy most of them.
+Two things follow. Break at the seam the test claims to guard rather than wherever a break
+is easy, because a red run the test did not cause proves nothing about that test. And
+surviving a mutation does not make a test decorative, since it may assert something the
+mutation left true. The question is never whether a test survived but whether it can fail
+for the reason it exists, so re-aim at its own claim before calling it decorative.
 
 ## The loop
 
 1. **Pick the mutation.** The smallest change to the code under test that should trip this
-   test, applied at the seam the test claims to guard. If the test says two implementations
-   of one interface agree, break one of them. If it says a parser rejects bad input, make
-   the parser accept it.
-2. **Run the suite** and read the output, not the exit code.
-3. **Confirm the failure is the right one.** The test you are verifying is among the
-   failures, and its message names the thing the test exists to protect. A test that fails
-   to compile, or dies in an import or a fixture, has not been verified.
-4. **Confirm the blast radius.** Where one test body runs over several inputs or several
-   implementations, breaking A must fail A's cases and leave B's passing. Table-driven
-   subtests in Go, one `describe` per implementation in Jest, a parametrised case in
-   pytest: three names for the shape this step needs, and each reports its cases
-   separately. Wrong radius means the test is measuring something other than what its name
-   says.
-5. **Revert the mutation** and confirm the suite is green again. Always. A mutation left
-   behind is a broken repository.
+   test, applied where the test says it is looking. If it claims two implementations agree,
+   break one of them. Not a shared import, a fixture, or a build setting: those fail
+   everything and say nothing about the test in front of you.
+2. **Run the suite and read the output**, not the exit code.
+3. **Confirm the failure is the right one.** The test under scrutiny is among the failures,
+   and its message names what that test protects. A run that dies in an import or a fixture
+   has verified nothing.
+4. **Confirm the blast radius.** Where one test body runs over several inputs or
+   implementations, breaking one must fail its own cases and leave the rest green. The
+   wrong radius means the test measures something other than its name.
+5. **Revert and confirm the suite is green.** Always, and before anything else. A mutation
+   left behind is a broken repository.
 
-If the suite is unchanged by the mutation, the test is decorative. Fix the test, then run
-this loop again on the fixed test.
+One mutation at a time, so the failures have one cause. Independent seams are therefore
+independent runs, and the loop fans out: give each seam its own working copy, run the loop
+there, and collect which cases each break turned red.
 
-## Choosing the mutation
+## An assertion that cannot fail
 
-Smallest, at the seam, one at a time.
+Assertions about shape rather than content go vacuous quietly. A contract test comparing
+the result types of two implementations, on an input that matches nothing, reduces to
+comparing two empty sets: it passes, it names a contract, and it guards nothing. Sorted key
+lists, lengths, and non-null checks fail the same way. Suspect those first, along with any
+green never yet contradicted.
 
-- Return an empty collection, a constant, or a null from one function.
-- Invert a single comparison or drop a single filter.
-- Delete one branch of the behaviour the test names.
+## Evidence, not a count
 
-Do not mutate configuration, build settings, imports, or a shared base class to break a
-specific test. Those produce failures everywhere and prove nothing about this test.
+> Made the cache's read return nothing unconditionally. All 8 cases in the `redis` group
+> failed, the 8 `memory` cases passed, nothing else moved. Reverted, suite green.
 
-## When a surviving test is correct
-
-Not every test that survives a mutation is decorative. A test can legitimately pass under
-a break that is outside what it asserts. Stub a function to return nothing and a test
-asserting that it returns nothing for a degenerate input keeps passing, and that is
-correct: the test asserts emptiness, and emptiness is what it got. It would still fail if
-the function returned something for that input, which is the failure it exists to catch.
-
-The question is never "did this test survive" but "can this test fail for the reason it
-exists". Verify a surviving test with a mutation aimed at its own claim.
-
-## Anti-patterns
-
-- **Mutating too broadly.** Breaking a shared import or renaming a fixture fails the whole
-  suite and tells you nothing about the test in front of you.
-- **Mutating the wrong layer.** Breaking the database when the test guards the parser
-  produces a red run that is not evidence.
-- **Reading the exit code only.** A non-zero exit with your test still passing means the
-  test is decorative and something else caught the break.
-- **Forgetting to revert.** Revert before you do anything else, and confirm green.
-- **Treating every survivor as a defect.** See above.
-
-## What to report
-
-Name the mutation, the cases that failed, and the cases that did not:
-
-> Made `RedisCache.get` return `undefined` unconditionally. All 8 cases in the `redis`
-> describe of `cache contract` failed; the 8 `memory` cases passed and nothing else moved.
-> Reverted, `vitest run` green.
-
-That is evidence. "50 tests pass" is not.
+The mutation, the cases that failed, the cases that did not, and the confirmed revert are
+evidence. "50 tests pass" is not.
