@@ -1,8 +1,8 @@
 {
   "expect_skill": true,
   "rubric": [
-    "The answer must say the work is not done, and must treat the port collision as invalidating the agent's green test result rather than as a harmless note or a minor warning.",
-    "The answer must state or clearly imply that both agents ran against the same shared services, so both green results are untrustworthy, not only the one that reported the collision.",
-    "The answer must call for re-running the suites serially against a known-clean stack before trusting either result."
+    "The answer must say the work is not done, and must treat the reuse of the already-booted simulator as invalidating the agent's green test result rather than as a harmless note or a minor warning.",
+    "The answer must state or clearly imply that both agents ran against the same simulator, so both green results are untrustworthy, not only the one that reported the problem.",
+    "The answer must call for re-running the suites serially against a known-clean simulator before trusting either result."
   ]
 }

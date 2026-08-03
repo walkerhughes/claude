@@ -1,0 +1,8 @@
+{
+  "expect_skill": true,
+  "rubric": [
+    "The plan must recognise that the three agents would share the one Terraform state file and the one sandbox account even though each has its own git worktree, and must not dispatch all three to apply concurrently against that single state and account.",
+    "The plan must resolve that sharing in at least one of these ways: give each agent its own state, workspace, or sandbox account so the applies do not meet; serialise the apply and smoke-test step so only one agent runs it at a time; keep the agents parallel on the code but do the applies and verification serially afterwards and treat the agents' own results as unverified; or give all the applying to a single agent.",
+    "It is not enough to merely mention worktrees, or to rely on the state lock alone, or to say the agents should 'be careful' or 'coordinate' without naming one of those resolutions."
+  ]
+}

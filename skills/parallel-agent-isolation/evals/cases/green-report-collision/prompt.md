@@ -1,10 +1,10 @@
 Two subagents I dispatched in parallel have finished. They worked in separate
-git worktrees on the same repo. Here is what the second one sent back:
+git worktrees on the same iOS app. Here is what the second one sent back:
 
-> Implemented the migration fix. Ran `make test-integration`: 84 passed, 0
-> failed. Note: `docker compose up -d` printed `Error response from daemon: Bind
-> for 0.0.0.0:5433 failed: port is already allocated`, so I used the Postgres
-> and OpenSearch instances that were already running. Suite is green.
+> Fixed the checkout crash. Ran the UI suite with `xcodebuild test`: 84 passed,
+> 0 failed. Note: a second simulator would not boot, so I ran against the
+> iPhone 16 simulator that was already booted and installed over the build that
+> was on it. Suite is green.
 
 The first agent reported green as well. Am I done? Tell me what to do next.
 

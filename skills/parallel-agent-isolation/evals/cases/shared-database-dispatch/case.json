@@ -1,8 +1,8 @@
 {
   "expect_skill": true,
   "rubric": [
-    "The plan must recognise that the two agents would share the Postgres and OpenSearch services even though each has its own git worktree, and must not dispatch both agents to run the integration suite concurrently against the one shared stack.",
-    "The plan must resolve that sharing in at least one of these ways: give each agent its own service instance on its own ports or compose project; serialise the integration-suite step so only one agent runs it at a time; keep the agents parallel but re-run the suites serially afterwards and treat the agents' own results as unverified; or give the integration work to a single agent.",
+    "The plan must recognise that the two agents would share the one staging Postgres instance even though each has its own git worktree, and must not dispatch both agents to run the e2e suite concurrently against it.",
+    "The plan must resolve that sharing in at least one of these ways: give each agent its own database instance, schema, or namespace; serialise the e2e step so only one agent runs it at a time; keep the agents parallel but re-run the suites serially afterwards and treat the agents' own results as unverified; or give the e2e work to a single agent.",
     "It is not enough to merely mention worktrees, or to say the agents should 'be careful' or 'coordinate' without naming one of those resolutions."
   ]
 }

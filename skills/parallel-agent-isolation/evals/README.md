@@ -25,22 +25,27 @@ test. Every case asserts on skill invocation; the triggering cases additionally
 grade the answer against a rubric using a second, tool-less Claude Code call
 that returns a structured verdict and never sees the skill.
 
-| Case | Skill must | The answer must |
-| --- | --- | --- |
-| `shared-database-dispatch` | load | resolve the shared Postgres and OpenSearch by isolating, serialising, re-verifying serially, or giving the stateful work to one agent, rather than dispatching both agents at the suite concurrently |
-| `green-report-collision` | load | treat a green suite reported alongside `port is already allocated` as invalid, extend the doubt to the other agent's green result, and re-run serially |
-| `file-only-parallel` | stay out | (not graded) |
+The triggering cases deliberately sit in different ecosystems and share different
+kinds of state, because a skill that recognised only containers and databases
+would pass a case set drawn from one stack while being useless on the next one.
+
+| Case | Stack, and what is shared | Skill must | The answer must |
+| --- | --- | --- | --- |
+| `shared-database-dispatch` | Go, one hosted staging database | load | resolve the shared instance by isolating, serialising, re-verifying serially, or giving the stateful work to one agent, rather than dispatching both agents at the suite concurrently |
+| `shared-infra-state` | Terraform, one remote state file and one sandbox account | load | resolve the shared state and account the same way, rather than letting three applies race through the lock |
+| `green-report-collision` | iOS, one booted simulator | load | treat a green suite reported alongside "a second simulator would not boot" as invalid, extend the doubt to the other agent's green result, and re-run serially |
+| `file-only-parallel` | any, nothing shared | stay out | (not graded) |
 
 `file-only-parallel` is the honesty check, and it earns its place. A description
-that fires on every mention of parallel agents would pass the other two cases
+that fires on every mention of parallel agents would pass the triggering cases
 while making the skill noise, so one case dispatches three agents over
 documentation edits and requires the skill to stay out of it. The first draft of
 the description failed exactly there, and so did a later attempt to shorten the
 clause that excludes file-only work.
 
 Whether a description triggers is sampled behaviour, so each case runs three
-times and every run must hold. Cost is roughly $1 a full run on `sonnet`, capped
-per call by `--max-budget-usd`. `EVAL_RUNS`, `EVAL_MODEL`,
+times and every run must hold. Cost is a dollar or so a full run on `sonnet`,
+capped per call by `--max-budget-usd`. `EVAL_RUNS`, `EVAL_MODEL`,
 `EVAL_MAX_BUDGET_USD`, and `EVAL_TIMEOUT_SEC` override the defaults. Pass case
 names as arguments to run a subset.
 
