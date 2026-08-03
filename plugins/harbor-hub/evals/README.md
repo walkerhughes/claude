@@ -124,6 +124,7 @@ the `harbor` CLI.
 
 ```bash
 export HARBOR_API_KEY=hk_...
+export ANTHROPIC_API_KEY=sk-ant-...   # or CLAUDE_CODE_OAUTH_TOKEN
 make evals          # the merge gate: drives the evals with claude-code
 ```
 
@@ -135,8 +136,8 @@ phases:
    job for `read-job` (`EVAL_READ_JOB_ID`) and one for `delete-job`
    (`EVAL_DELETE_JOB_ID`). Fresh ids per run mean no cross-run collisions; two
    jobs mean the parallel evals cannot race each other.
-2. **Run** -- a single `harbor run -p evals/ -a claude-code` executes all the
-   evals in parallel, then the runner gates on every reward being `1.0`
+2. **Run** -- a single `harbor run -a claude-code` executes all the evals in
+   parallel, then the runner gates on every reward being `1.0`
    (`evals/check_reward.py`) -- `harbor run` exits 0 regardless of reward, so
    the runner inspects the result itself. `check-published-task` checks the
    pinned public task `hello-world/hello-world@1`.
@@ -146,6 +147,20 @@ phases:
 
 `HARBOR_TEST_ENV` selects `docker` (default; needs a local Docker daemon) or
 `modal` (needs Modal credentials); CI's gate uses modal.
+
+`HARBOR_MCP_REF` (default `main`) is the git ref the eval images
+pip-install `harbor-mcp` from. It matters more than it looks: the images do not
+build from your checkout, so by default a run exercises whatever is on `main`,
+not the code in front of you. CI passes the PR head sha, without which the gate
+would build main's server and greenlight a PR that breaks the MCP. Set it
+locally to test a branch:
+
+```bash
+HARBOR_MCP_REF="$(git rev-parse HEAD)" make evals   # must be pushed first
+```
+
+The runner pins the ref in a throwaway copy of `evals/` rather than rewriting
+the checkout, so an interrupted run leaves no pinned Dockerfile behind.
 
 ## Eval-safety check
 
@@ -163,16 +178,30 @@ The oracle is gated on `outcome` only (`check_reward.py --only outcome`). It is
 a shell script, not an agent: it leaves no trajectory and cannot call MCP tools,
 so `process` is not oracle-solvable by construction. The nop agent is gated on
 both rewards, which is strictly stronger. This runs in CI
-via [`eval-safety.yml`](../.github/workflows/eval-safety.yml) on every PR that
-touches `evals/**`, so the evals stay honest independently of the merge gate.
+via [`harbor-hub-eval-safety.yml`](../../../.github/workflows/harbor-hub-eval-safety.yml)
+on every PR that touches `evals/**`, so the evals stay honest independently of
+the merge gate.
 
-## Two-phase rollout
+## In CI
 
-1. This PR adds the evals and the eval-safety check (not yet a merge gate).
-2. A follow-up adds the `evals` job to [`ci.yml`](../.github/workflows/ci.yml):
-   it runs `make evals` with claude-code on modal for every PR to `main` and is
-   marked a required status check, gating merges on the MCP capabilities.
+Both live in [`harbor-hub.yml`](../../../.github/workflows/harbor-hub.yml) and
+[`harbor-hub-eval-safety.yml`](../../../.github/workflows/harbor-hub-eval-safety.yml):
 
-Note: the eval images install `harbor-mcp` from the GitHub default branch, so
-today the gate exercises the published server, not an open PR's server changes.
-Building the image from the PR checkout is a tracked follow-up.
+| Job | Agent | Costs tokens | Runs on |
+| --- | --- | --- | --- |
+| `lint-unit` | -- | no | every PR touching the plugin |
+| `integration` | -- | no | same, needs `HARBOR_API_KEY` |
+| `e2e` | oracle | no | same, needs Modal |
+| `eval-safety` | oracle + nop | no | PRs touching `evals/**` |
+| `evals` | **claude-code** | **yes** | same-repo PRs and pushes to main |
+
+`evals` is the merge gate on the MCP capability surface. It `needs: [lint-unit]`
+so a formatting slip does not burn tokens, and is guarded to same-repo events
+because a fork PR gets no secrets.
+
+Every secret-dependent job here skips silently when its secret is absent, so a
+green check is not by itself proof the job ran -- check the log if it returned
+suspiciously fast.
+
+To make `evals` binding, mark it a required status check in the repo's branch
+protection for `main`.

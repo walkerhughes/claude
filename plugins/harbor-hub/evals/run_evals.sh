@@ -33,6 +33,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARBOR_TEST_ENV="${HARBOR_TEST_ENV:-docker}"
 EVAL_TASK_REF="${EVAL_TASK_REF:-hello-world/hello-world@1}"
+# Git ref the eval images pip-install harbor-mcp from. The default branch is
+# only right for a run of main: as a PR gate the images must be built from the
+# code under review, or the gate greenlights a broken server because it tested
+# main's. CI passes the PR head sha.
+HARBOR_MCP_REF="${HARBOR_MCP_REF:-main}"
 JOBS_DIR="$(mktemp -d)"
 
 # shellcheck source=evals/_hublib.sh
@@ -61,6 +66,23 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; the
         "the claude-code agent will likely fail to authenticate" >&2
 fi
 
+# Pin the images to HARBOR_MCP_REF in a throwaway copy of the tree rather than
+# rewriting the checkout: an interrupted run must not leave a pinned Dockerfile
+# behind for the next one to build from.
+EVALS_SRC="$JOBS_DIR/evals-src"
+cp -R "$REPO_ROOT/evals" "$EVALS_SRC"
+pinned=0
+while IFS= read -r dockerfile; do
+    sed -i.bak \
+        "s|claude\.git#subdirectory|claude.git@${HARBOR_MCP_REF}#subdirectory|" \
+        "$dockerfile"
+    rm -f "$dockerfile.bak"
+    pinned=$((pinned + 1))
+done < <(grep -rl 'claude\.git#subdirectory' "$EVALS_SRC")
+[ "$pinned" -gt 0 ] \
+    || die "no eval Dockerfile pinned to $HARBOR_MCP_REF; the install line moved"
+echo "==> Eval images will build harbor-mcp from $HARBOR_MCP_REF ($pinned Dockerfiles)"
+
 echo "==> Seeding hub jobs (oracle, env: $HARBOR_TEST_ENV)"
 READ_JOB_ID="$(bootstrap_job "$JOBS_DIR/seed-read" harbor-mcp-eval-read)"
 DELETE_JOB_ID="$(bootstrap_job "$JOBS_DIR/seed-delete" harbor-mcp-eval-delete)"
@@ -77,7 +99,7 @@ echo "==> Running all evals in parallel (claude-code, env: $HARBOR_TEST_ENV)"
 # abort in non-interactive CI otherwise).
 harbor run \
     -y \
-    -p "$REPO_ROOT/evals" \
+    -p "$EVALS_SRC" \
     -a claude-code \
     -e "$HARBOR_TEST_ENV" \
     -o "$JOBS_DIR" \
