@@ -15,6 +15,18 @@ Formerly `walkerhughes/mcps`, back when it only held MCP servers.
 
 They follow Honeycomb's [MCP, easy as 1-2-3](https://www.honeycomb.io/blog/mcp-easy-as-1-2-3) guidance: a few curated tools built around real questions rather than raw API endpoints, responses shaped for a model instead of a UI, and typed schemas that steer the model toward valid calls.
 
+## Skills
+
+Skills live in top-level `skills/`, one directory each, and ship through the marketplace as their own installable entries.
+
+| Skill | What it does |
+|-------|--------------|
+| [`prove-the-test-fails`](skills/prove-the-test-fails/) | Breaks the code under test to confirm a test can actually fail, and fails for the right reason, before trusting it. |
+
+A skill's marketplace entry sets `source: "./"` with a `skills` path pointing at its own directory, so several skills share the one top-level folder without loading each other, and `strict: false` because the repository root has no `plugin.json` to be the authority. Entries deliberately carry no `version`: Claude Code then resolves the version from the commit SHA, so every change reaches installed copies without a manual bump, and the stale-cache trap described below does not apply.
+
+Each skill directory carries its own checks, run from that directory: `make check` for packaging and wiring, which needs no credentials, and `make evals` for behaviour, which costs tokens. CI runs both per skill through `paths` filters, as it does for the servers.
+
 ## Install a plugin
 
 Run these as two separate commands, not as one paste: the first opens a prompt that expects only the `owner/repo`.
@@ -44,11 +56,13 @@ Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launc
 ```
 claude/
 ├── .claude-plugin/          # marketplace manifest
-└── plugins/
-    ├── harbor-hub/
-    └── tastytrade/
+├── plugins/
+│   ├── harbor-hub/
+│   └── tastytrade/
+└── skills/
+    └── prove-the-test-fails/
 ```
 
-Plugins live under `plugins/`, one directory each, named for the platform they talk to rather than for being an MCP server. Skills and other components get their own top-level directories as they arrive.
+Plugins live under `plugins/`, one directory each, named for the platform they talk to rather than for being an MCP server. Skills live under `skills/`, named for the practice they encode. Other components get their own top-level directories as they arrive.
 
 Each plugin directory is self-contained: its own `README.md` covers install, credentials, tests, and tools. CI runs per subdirectory via `paths` filters, so a change to one never runs another's suite.

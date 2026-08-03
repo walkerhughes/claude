@@ -15,6 +15,13 @@
       "name": "tastytrade",
       "source": "./plugins/tastytrade",
       "description": "Inspect TastyTrade brokerage accounts, positions, market data, option chains, and transactions from Claude Code. Order placement is gated off by default."
+    },
+    {
+      "name": "prove-the-test-fails",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/prove-the-test-fails"],
+      "description": "Break the code under test to confirm a test can actually fail, and fails for the right reason, before trusting it."
     }
   ]
 }

@@ -1,0 +1,59 @@
+name: skill prove-the-test-fails
+
+# One workflow per skill, matching the per-component paths filters used for the
+# MCP servers, so a change to one skill never runs another's checks.
+#
+# marketplace.json is in the filter because it is the shared file: an entry
+# edited by another skill's pull request can silently stop this one loading.
+on:
+  pull_request:
+    paths:
+      - "skills/prove-the-test-fails/**"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/skill-prove-the-test-fails.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skills/prove-the-test-fails/**"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/skill-prove-the-test-fails.yml"
+
+defaults:
+  run:
+    working-directory: skills/prove-the-test-fails
+
+jobs:
+  wiring:
+    # Packaging, marketplace entry, and the fixture's honesty. No credentials.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: make check
+      - run: npm install -g @anthropic-ai/claude-code
+      - name: Validate the marketplace manifest
+        working-directory: .
+        run: claude plugin validate . --strict
+
+  evals:
+    # Behavioural: does the skill lead to breaking the code and reading the
+    # result. Costs Anthropic tokens, so it skips without a key (fork PRs get
+    # no secrets).
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Run the behavioural eval
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY absent (fork PR?); skipping the behavioural eval."
+            exit 0
+          fi
+          npm install -g @anthropic-ai/claude-code
+          make evals
