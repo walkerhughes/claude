@@ -120,8 +120,9 @@ jobs:
       # reward 1.0" -- a red gate that reads as an MCP regression and isn't.
       # Fails rather than skips on a missing token, matching this repo's stance
       # that a secret-dependent job silently going green is the worse failure.
-      # Only a 401 is fatal: the token is not necessarily scoped for direct
-      # /v1/messages calls, so no other status is evidence either way.
+      # A setup-token credential does authenticate a direct /v1/messages call
+      # (verified: 200), so anything other than 200 is a real problem and the
+      # gate should not spend a rate-limit window finding that out the slow way.
       - name: Check the subscription token
         run: |
           set -euo pipefail
@@ -140,7 +141,12 @@ jobs:
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is expired or revoked. Mint a new one with 'claude setup-token' and update the repository secret."
             exit 1
           fi
-          echo "Auth probe returned HTTP $status; proceeding."
+          if [ "$status" != "200" ]; then
+            echo "::error::Auth probe returned HTTP $status, expected 200. The gate would likely fail after spending a rate-limit window; response body:"
+            cat /tmp/auth-probe.json
+            exit 1
+          fi
+          echo "Auth probe returned HTTP 200; proceeding."
       - name: Run the eval gate (claude-code)
         env:
           # The PR's merge commit is not on the remote, so pip could not fetch
