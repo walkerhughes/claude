@@ -105,6 +105,10 @@ jobs:
           # it; head.sha is the branch tip and is pushed.
           HARBOR_MCP_REF: ${{ github.event.pull_request.head.sha || github.sha }}
           EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
+          # Push to main only. PR runs would mint a hub job per push with
+          # nothing to clean them up; main's runs are the ones worth keeping a
+          # reward/cost/token trend for.
+          EVALS_UPLOAD: ${{ github.event_name == 'push' && '1' || '' }}
         run: make evals
       # A `process` failure is only diagnosable from the agent's trajectory:
       # the score alone cannot distinguish a tool-name mismatch from a real

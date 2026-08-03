@@ -199,6 +199,18 @@ Both live in [`harbor-hub.yml`](../../../.github/workflows/harbor-hub.yml) and
 so a formatting slip does not burn tokens, and is guarded to same-repo events
 because a fork PR gets no secrets.
 
+### What survives a run
+
+By default nothing does. `harbor run` uploads only when asked, so a PR run
+leaves its results in the CI log and, on failure, in the `eval-trials`
+artifact (7-day retention). The seeded jobs are dropped on exit by design.
+
+`EVALS_UPLOAD` adds `--upload`, and CI sets it **only on pushes to main**, so
+the hub keeps a reward/cost/token trend for the branch that ships without a
+PR run minting a job per push -- unlike the seeds, nothing cleans these up.
+Uploaded jobs are private by default, but the trajectories carry the eval
+instructions and the agent's full reasoning.
+
 Every secret-dependent job here skips silently when its secret is absent, so a
 green check is not by itself proof the job ran -- check the log if it returned
 suspiciously fast.

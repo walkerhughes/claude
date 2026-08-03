@@ -109,17 +109,29 @@ export EVAL_DELETE_JOB_ID="$DELETE_JOB_ID"
 echo "==> Running all evals in parallel (claude-code, env: $HARBOR_TEST_ENV)"
 # -y auto-confirms harbor's prompt for [verifier.env] host vars (it would
 # abort in non-interactive CI otherwise).
-harbor run \
-    -y \
-    -p "$EVALS_SRC" \
-    -a claude-code \
-    -e "$HARBOR_TEST_ENV" \
-    -o "$JOBS_DIR" \
-    --job-name evals-gate \
-    --ae HARBOR_API_KEY="$HARBOR_API_KEY" \
-    --ae EVAL_READ_JOB_ID="$READ_JOB_ID" \
-    --ae EVAL_DELETE_JOB_ID="$DELETE_JOB_ID" \
+run_args=(
+    -y
+    -p "$EVALS_SRC"
+    -a claude-code
+    -e "$HARBOR_TEST_ENV"
+    -o "$JOBS_DIR"
+    --job-name evals-gate
+    --ae HARBOR_API_KEY="$HARBOR_API_KEY"
+    --ae EVAL_READ_JOB_ID="$READ_JOB_ID"
+    --ae EVAL_DELETE_JOB_ID="$DELETE_JOB_ID"
     --ae EVAL_TASK_REF="$EVAL_TASK_REF"
+)
+# Off by default, and off for PR runs: a job per push would pile up, and unlike
+# the seeds nothing drops these -- persisting them is the point. CI sets it on
+# pushes to main, so the hub keeps the reward/cost/token trend for the branch
+# that ships. Uploaded jobs are private by default; the trajectories contain
+# the eval instructions and the agent's full reasoning.
+if [ -n "${EVALS_UPLOAD:-}" ]; then
+    echo "==> Results will be uploaded to the Harbor hub"
+    run_args+=(--upload)
+fi
+
+harbor run "${run_args[@]}"
 
 # harbor run exits 0 regardless of reward; gate on a perfect result so CI
 # (and `make evals`) fails the moment any eval regresses.
