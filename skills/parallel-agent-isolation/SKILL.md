@@ -6,69 +6,65 @@ when_to_use: Use when two or more agents will run concurrently AND their work to
 
 # Parallel agents share more than the filesystem
 
-Ask this before dispatch:
+Decide what concurrently running agents will contend for before dispatching
+them, and treat any result produced under contention as unverified.
 
-> **What stateful thing outside the filesystem will these agents share?**
+A git worktree isolates files and nothing else. Agents in separate worktrees
+still query the one database, boot the one device, hold the one lock, and spend
+the one account's quota. Shared state is whatever exists as a single instance
+and carries changes between calls, so what one agent does lands where another
+will read it.
 
-A git worktree isolates files. It isolates nothing else. Two agents in separate
-worktrees still query the one database, boot the one simulator, and lock the one
-remote state file.
+## The failure is silent
 
-## What counts
+Contention does not raise an error. Two suites against one database interleave,
+and a fixture truncating tables between tests deletes the other run's rows
+mid-test, so both go green. Two runs driving one device tap each other's
+screens. Two applies against one state file each plan against a world the other
+has already changed. All of them report success, indistinguishably from an
+honest run.
 
-- Databases and search indexes, and the fixtures that truncate or seed them
-- Message brokers and caches, and anything holding state between requests
-- Fixed ports, and container or project names derived from a directory name
-- Devices, emulators, and simulators, where one is booted at a time
-- Shared cloud resources: a bucket, a queue, a staging environment, an IaC state file
-- A shared test account, or an API key with per-account state or rate limits
+So this is decided before dispatch, not diagnosed after. Afterwards there is
+nothing to find, only the question of whether the result was produced under
+contention, and a result produced under contention is unverified whatever it
+says.
 
-If nothing on that list is in play, the work is file-local. Dispatch in parallel
-and stop reading.
+## The pre-dispatch workflow
 
-## Pick one
+**1. Name what will be contended for.** Ask what stateful things outside the
+filesystem these agents will share, and name each one separately. The obvious
+resource usually hides a second, and resolving one leaves the other shared. If
+the honest answer is nothing, the work is file-local: dispatch in parallel and
+stop here.
 
-| Strategy | Fits when |
-| --- | --- |
-| **Isolate.** Each agent gets its own instance, on its own ports, schema, namespace, or account. | The resource is cheap to duplicate and the parallel work is long enough to repay the setup. |
-| **Serialise the stateful step.** Agents work in parallel; a lock, or the dispatcher, lets one run the suite at a time. | The shared step is short next to the work around it. |
-| **Parallel, then re-verify serially.** Let them run, treat every agent's test result as unverified, and re-run the suites yourself one at a time. | The suite is fast and the agents' edits do not conflict. Say up front that their results are advisory. |
-| **Split the work.** One agent owns everything that touches the resource; the rest parallelise around it. | Only some of the tasks need the resource at all. |
+**2. Choose how the contention resolves.** Any of the four chosen deliberately
+beats meeting the collision later.
 
-Re-verify serially when unsure. It is the cheapest of the four to get right, and
-the only one that still works when an agent ignores its instructions.
+- **Isolate.** Each agent gets its own instance, ports, schema, or account. Fits
+  when duplicating the resource is cheap next to the work it unblocks.
+- **Serialise the stateful step.** Agents run in parallel, and the dispatcher
+  lets one at a time through the step that touches the resource. Fits when that
+  step is short next to the work around it. A built-in lock is not this: it
+  covers only the thing it guards, leaving whatever that thing mutates still
+  shared, so the serialised region has to span the change and the verification
+  that depends on it.
+- **Parallel, then verify serially.** Take every agent's result as advisory and
+  re-run the verification yourself, one at a time. Fits when verification is
+  cheap, and it is the only option that still holds when an agent ignores its
+  instructions, so prefer it when unsure.
+- **Split the work.** One agent owns everything touching the resource; the rest
+  parallelise around it. Fits when only some tasks need the resource at all.
 
-## The collision is silent
+**3. Dispatch with the reporting requirement.** Require each agent to report how
+it verified its work, not just the outcome: the command it ran, and whether
+every service, device, environment, and account that command touched was its
+alone. Say up front that a result which cannot answer that is advisory. A green
+result that does not say how it was produced is unverified.
 
-Two suites on one database interleave. Fixtures that truncate tables around each
-test delete the other run's rows mid-test. Both suites go green. The shape
-repeats wherever state is shared: two runs driving one simulator tap each
-other's screens, two applies against one state file each plan against a world
-the other has already changed.
+## The anti-pattern
 
-So an agent that could not get its own instance and used the one already there
-has reported a **corrupted run, not a workaround**. The signal is any claim that
-the agent reused a resource it could not create, whatever the wording:
-
-- `port is already allocated`, `address already in use`, `container name ... is already in use`
-- "no free simulator, so I used the booted one", "the shared staging database was already migrated"
-- "the services were already up", "reused the existing stack", "skipped the setup step"
-
-## Make it detectable
-
-Put the reporting requirement in the dispatch prompt, not just the expectation:
-
-> Report how you ran the tests: the exact command, and whether every service,
-> device, environment, and account it touched was yours alone. If you could not
-> get your own, stop and say so rather than using the one already running.
-
-A green result that does not say how it was produced is unverified.
-
-## Clean up
-
-- Whatever an aborted start leaves half-made: a booted device, a held lock, a
-  partly applied stack. Containers are the common case, stranded in `created` or
-  `exited`: `docker ps -a`, then remove by project.
-- Worktrees: `git worktree list`, then `git worktree remove`.
-- Branches a worktree pinned. The branch will not delete while its worktree
-  exists, so remove worktrees first and branches second.
+An agent reports that it could not obtain its own instance of a shared resource,
+used the one already running, and finished green. That is a corrupted run
+presented as a workaround. It invalidates its own result rather than excusing
+it, and casts the same doubt over every other agent that was using the resource
+at the time.

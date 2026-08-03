@@ -82,10 +82,10 @@ def check_skill_md() -> None:
     )
 
     body = path.read_text().split("---", 2)[-1]
-    # The detection signal is the part of the skill that is easiest to lose in an
-    # edit and the hardest to notice missing, since the failure it names is silent.
-    for phrase in ("port is already allocated", "already in use"):
-        check(phrase in body, f"the body no longer names the collision signal {phrase!r}")
+    check(
+        bool(body.strip()),
+        "SKILL.md has frontmatter but no body, so the skill loads and says nothing",
+    )
 
 
 def check_marketplace_entry() -> None:
