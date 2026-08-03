@@ -799,7 +799,7 @@ dev = [
 requires-dist = [
     { name = "harbor", specifier = "==0.18.0" },
     { name = "harbor", extras = ["modal"], marker = "extra == 'modal'", specifier = "==0.18.0" },
-    { name = "mcp", specifier = ">=1.2" },
+    { name = "mcp", specifier = ">=1.2,<2" },
 ]
 
 [package.metadata.requires-dev]

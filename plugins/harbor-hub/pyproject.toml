@@ -11,7 +11,11 @@ dependencies = [
     # Pinned exactly: we import harbor internals (hub, upload, publisher, db),
     # which are not a stable public API. Bump deliberately.
     "harbor==0.18.0",
-    "mcp>=1.2",
+    # Capped below 2: mcp 2.0.0 removed mcp.server.fastmcp, which server.py
+    # imports. uv.lock hid this locally (pinned 1.28.1) while every fresh
+    # `pip install harbor-mcp` resolved 2.0.0 and crashed the server on import.
+    # Lifting the cap means porting server.py off mcp.server.fastmcp first.
+    "mcp>=1.2,<2",
 ]
 
 [project.optional-dependencies]
