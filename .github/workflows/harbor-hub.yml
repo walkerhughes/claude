@@ -74,9 +74,21 @@ jobs:
     # (the answer, self-truthed from the hub) and process (the answer came
     # through the MCP tools, not a harbor CLI shortcut).
     #
-    # Unlike every other job here this one costs Anthropic tokens, so it is
-    # last and narrowly triggered. It needs the hub key, Modal, and Anthropic
+    # Unlike every other job here this one spends model tokens, so it is last
+    # and narrowly triggered. It needs the hub key, Modal, and Anthropic
     # together; a fork PR gets no secrets, hence the same-repo guard as e2e.
+    #
+    # It spends them against a Claude subscription rather than API credits.
+    # CLAUDE_FORCE_OAUTH makes harbor's claude-code agent blank
+    # ANTHROPIC_API_KEY before building the container env, so only
+    # CLAUDE_CODE_OAUTH_TOKEN survives and the CLI falls back to subscription
+    # auth. Never add ANTHROPIC_API_KEY back: with both present and the flag
+    # unset the CLI silently prefers the key and the run is on credits again,
+    # with only a debug log to say so.
+    #
+    # Serialized across runs on purpose. Subscription rate limits are per
+    # account and shared with interactive use, so overlapping gates would eat
+    # the same 5-hour window.
     #
     # HARBOR_MCP_REF makes the eval images pip-install harbor-mcp from the
     # commit under review instead of main. Without it the gate builds main's
@@ -85,9 +97,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-unit]
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    concurrency:
+      group: harbor-hub-evals
+      cancel-in-progress: false
     env:
       HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_FORCE_OAUTH: "1"
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
       MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
       HARBOR_TEST_ENV: modal
@@ -99,6 +115,32 @@ jobs:
       - run: uv sync --dev --extra modal
       # run_evals.sh calls the bare `harbor` console script from the venv.
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      # A `setup-token` credential is long-lived but not permanent. Without
+      # this probe an expired one surfaces as "the evals did not all reach
+      # reward 1.0" -- a red gate that reads as an MCP regression and isn't.
+      # Fails rather than skips on a missing token, matching this repo's stance
+      # that a secret-dependent job silently going green is the worse failure.
+      # Only a 401 is fatal: the token is not necessarily scoped for direct
+      # /v1/messages calls, so no other status is evidence either way.
+      - name: Check the subscription token
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Mint one with 'claude setup-token' and add it as a repository secret."
+            exit 1
+          fi
+          status="$(curl -sS -o /tmp/auth-probe.json -w '%{http_code}' \
+            https://api.anthropic.com/v1/messages \
+            -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')"
+          if [ "$status" = "401" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is expired or revoked. Mint a new one with 'claude setup-token' and update the repository secret."
+            exit 1
+          fi
+          echo "Auth probe returned HTTP $status; proceeding."
       - name: Run the eval gate (claude-code)
         env:
           # The PR's merge commit is not on the remote, so pip could not fetch
