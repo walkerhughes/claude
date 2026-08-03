@@ -104,4 +104,16 @@ jobs:
           # The PR's merge commit is not on the remote, so pip could not fetch
           # it; head.sha is the branch tip and is pushed.
           HARBOR_MCP_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
         run: make evals
+      # A `process` failure is only diagnosable from the agent's trajectory:
+      # the score alone cannot distinguish a tool-name mismatch from a real
+      # CLI shortcut. Keep the trials so the next step is reading them, not
+      # re-running the gate.
+      - name: Upload trials for diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-trials
+          path: ${{ runner.temp }}/eval-trials
+          retention-days: 7

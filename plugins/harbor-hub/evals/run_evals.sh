@@ -38,7 +38,19 @@ EVAL_TASK_REF="${EVAL_TASK_REF:-hello-world/hello-world@1}"
 # code under review, or the gate greenlights a broken server because it tested
 # main's. CI passes the PR head sha.
 HARBOR_MCP_REF="${HARBOR_MCP_REF:-main}"
-JOBS_DIR="$(mktemp -d)"
+# Where the run's trials land. Defaults to a temp dir that is deleted on exit;
+# set EVALS_OUT_DIR to keep them. A `process` failure is only diagnosable from
+# the agent's trajectory, so throwing the trials away leaves you with a bare
+# 0.0 and no way to tell a wrong tool name from a real CLI shortcut. CI sets
+# this and uploads the tree when the gate fails.
+JOBS_DIR="${EVALS_OUT_DIR:-}"
+if [ -n "$JOBS_DIR" ]; then
+    mkdir -p "$JOBS_DIR"
+    KEEP_JOBS_DIR=1
+else
+    JOBS_DIR="$(mktemp -d)"
+    KEEP_JOBS_DIR=0
+fi
 
 # shellcheck source=evals/_hublib.sh
 . "$REPO_ROOT/evals/_hublib.sh"
@@ -46,7 +58,7 @@ JOBS_DIR="$(mktemp -d)"
 READ_JOB_ID=""
 DELETE_JOB_ID=""
 cleanup() {
-    rm -rf "$JOBS_DIR"
+    [ "$KEEP_JOBS_DIR" -eq 1 ] || rm -rf "$JOBS_DIR"
     drop_job "$READ_JOB_ID"
     drop_job "$DELETE_JOB_ID"
 }
