@@ -1,20 +1,23 @@
 # prove-the-test-fails evals
 
-Two checks over one fixture. The fixture is a small retrieval library with a suite that
-is green and a contract test that cannot fail, reproducing a defect found in a real
-codebase: an assertion comparing sets of result types, on a query that matches nothing,
-so it reduces to `set() == set()` whatever the strategies do.
+Two checks over one fixture. The fixture is a small route matcher with a suite that is
+green and a contract test that cannot fail, reproducing a defect shape found in a real
+codebase: an assertion comparing sets of result types, on an input that matches nothing,
+so it reduces to `set() == set()` whatever the implementations do.
 
 ```
 fixture/
-├── src/retrieval.py        two lexical strategies over one corpus
+├── src/routing.py          two implementations of one matcher over one route table
 └── tests/test_contract.py  five passing tests, one of them decorative
 ```
 
-The fixture also carries the two cases the skill warns about. Stubbing `lexical_search`
-to return nothing fails only the `[lexical]` cases of `test_finds_a_phrase_from_the_corpus`
-and leaves the `[bm25]` cases green, which is the blast radius a correct mutation
-produces. And `test_empty_query_returns_nothing[lexical]` survives that same mutation
+Python because the checks need some real codebase to run, not because the skill is about
+Python. A fixture per ecosystem would cost a lot and measure the same method.
+
+The fixture also carries the two cases the skill warns about. Stubbing `regex_router` to
+return nothing fails only the `[regex]` case of `test_matches_a_route_with_a_parameter`
+and leaves the `[segment]` case green, which is the blast radius a correct mutation
+produces. And `test_empty_path_matches_nothing[regex]` survives that same mutation
 legitimately, because asserting emptiness is satisfied by an empty implementation.
 
 ## The eval
@@ -30,7 +33,7 @@ to. Grading is on behaviour rather than prose:
 
 | Check | Why |
 | --- | --- |
-| First line of `VERDICT.txt` is `UNGUARDED` | Only knowable by breaking a strategy and watching the contract test stay green |
+| First line of `VERDICT.txt` is `UNGUARDED` | Only knowable by breaking an implementation and watching the contract test stay green |
 | `src`, `tests`, and `pyproject.toml` match the starting commit | Any mutation was reverted |
 | The suite is green again | The repository was left working |
 
@@ -52,8 +55,8 @@ measurement, and until that happens the eval should not be described as one.
 
 The eval only asks a real question while the fixture's contract test genuinely cannot
 fail. This applies the mutation an agent is expected to find and asserts the exact shape
-of the run that follows: the contract test survives, the `[lexical]` phrase case dies,
-the `[bm25]` case lives, and the empty-query case survives. Repairing the fixture's
+of the run that follows: the contract test survives, the `[regex]` parameter case dies,
+the `[segment]` case lives, and the empty-path case survives. Repairing the fixture's
 assertion turns this red with a message saying the eval no longer poses its question. It
 works on a copy, so the checked-in fixture is never mutated.
 

@@ -5,7 +5,7 @@
 # headless Claude Code run as a project skill, and asks the question the skill exists to
 # answer: can this test fail? Grading is on behaviour, not prose:
 #
-#   1. the verdict is UNGUARDED, which is only knowable by breaking a strategy
+#   1. the verdict is UNGUARDED, which is only knowable by breaking an implementation
 #   2. the tracked files are byte-identical to the starting commit, so any mutation the
 #      agent applied was reverted
 #   3. the suite is green again at the end

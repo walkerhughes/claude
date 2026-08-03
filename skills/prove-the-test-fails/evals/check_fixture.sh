@@ -2,11 +2,11 @@
 # Proves the eval fixture is still a trap. No agent, no LLM, no network beyond
 # fetching pytest.
 #
-# The agentic eval is only meaningful while `test_strategies_satisfy_the_same_contract`
+# The agentic eval is only meaningful while `test_routers_satisfy_the_same_contract`
 # genuinely cannot fail. This applies the mutation the eval expects an agent to find,
-# stubbing `lexical_search` to return nothing, and asserts the exact shape of the
-# resulting run: the contract test survives, the lexical cases of the phrase test die,
-# the bm25 cases live, and the empty-query test survives for its own good reason. If
+# stubbing `regex_router` to return nothing, and asserts the exact shape of the
+# resulting run: the contract test survives, the regex case of the parameter test dies,
+# the segment case lives, and the empty-path test survives for its own good reason. If
 # someone repairs the fixture's assertion, this goes red and says so.
 #
 # Runs on a copy: the checked-in fixture is never mutated.
@@ -28,15 +28,15 @@ echo "==> baseline: the fixture suite must be green"
     exit 1
 }
 
-echo "==> mutation: stub lexical_search to return nothing"
+echo "==> mutation: stub regex_router to return nothing"
 (cd "$work" && python3 - <<'PY'
 import pathlib
 
-source = pathlib.Path("src/retrieval.py")
+source = pathlib.Path("src/routing.py")
 text = source.read_text()
-anchor = '    """Full-text ranking: every match scores the same, ties break on identifier."""\n'
+anchor = '    """Compiled patterns: each route becomes a regex the whole path must match."""\n'
 if anchor not in text:
-    raise SystemExit("FAIL: lexical_search no longer looks the way this check expects.")
+    raise SystemExit("FAIL: regex_router no longer looks the way this check expects.")
 source.write_text(text.replace(anchor, anchor + "    return []\n", 1))
 PY
 )
@@ -56,18 +56,18 @@ expect() {
 }
 
 # The trap itself: the one test that claims to guard the shared contract does not
-# notice that a strategy stopped returning anything.
-expect "test_strategies_satisfy_the_same_contract" PASSED \
+# notice that an implementation stopped returning anything.
+expect "test_routers_satisfy_the_same_contract" PASSED \
     "the fixture's contract test can fail now, so the eval no longer poses the question it was written to pose"
 
-# Blast radius: the mutation is confined to the lexical strategy.
-expect "test_finds_a_phrase_from_the_corpus[lexical]" FAILED \
+# Blast radius: the mutation is confined to one of the two implementations.
+expect "test_matches_a_route_with_a_parameter[regex]" FAILED \
     "the mutation stopped reaching the code the test covers"
-expect "test_finds_a_phrase_from_the_corpus[bm25]" PASSED \
-    "the mutation leaked into the other strategy, so the fixture no longer shows a blast radius"
+expect "test_matches_a_route_with_a_parameter[segment]" PASSED \
+    "the mutation leaked into the other implementation, so the fixture no longer shows a blast radius"
 
 # The legitimate survivor: asserting emptiness is satisfied by an empty implementation.
-expect "test_empty_query_returns_nothing[lexical]" PASSED \
+expect "test_empty_path_matches_nothing[regex]" PASSED \
     "the fixture no longer contains a test that correctly survives the mutation"
 
 if [ "$status" -ne 0 ]; then

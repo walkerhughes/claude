@@ -8,31 +8,37 @@ description: Break the code under test to confirm a test can actually fail, and 
 A test you just wrote is not verified until you have watched it fail for the right reason.
 A green run tells you the assertions did not raise. It does not tell you they could.
 
+Nothing below depends on a language or a runner. `go test`, pytest, Jest, Vitest, XCTest,
+RSpec and `cargo test` all report the same two things: which cases ran, and which failed.
+
 ## When to run this
 
 - A test you just wrote or just refactored, before moving on.
 - A test that has never been observed failing, including one inherited green from CI.
-- Any suite described as guarding a contract, an invariant, or two implementations agreeing.
-  These are the ones that go vacuous quietly, because the assertion is about shape rather
-  than content.
+- Any suite described as guarding a contract, an invariant, or two implementations of one
+  interface agreeing. These are the ones that go vacuous quietly, because the assertion is
+  about shape rather than content.
 - Before reporting "the tests pass" as evidence that a change works.
 
 An assertion that compares derived collections is the highest-risk shape: sets of types,
-sorted key lists, lengths, `is not None`. Two empty results satisfy most of them.
+sorted key lists, lengths, non-null checks. Two empty results satisfy most of them.
 
 ## The loop
 
 1. **Pick the mutation.** The smallest change to the code under test that should trip this
-   test, applied at the seam the test claims to guard. If the test says two strategies
-   agree, break one strategy. If it says a parser rejects bad input, make the parser
-   accept it.
+   test, applied at the seam the test claims to guard. If the test says two implementations
+   of one interface agree, break one of them. If it says a parser rejects bad input, make
+   the parser accept it.
 2. **Run the suite** and read the output, not the exit code.
 3. **Confirm the failure is the right one.** The test you are verifying is among the
    failures, and its message names the thing the test exists to protect. A test that fails
-   with an import error or a fixture error has not been verified.
-4. **Confirm the blast radius.** In a parametrised or multi-implementation suite, breaking
-   implementation A must fail A's cases and leave B's passing. Wrong radius means the test
-   is measuring something other than what its name says.
+   to compile, or dies in an import or a fixture, has not been verified.
+4. **Confirm the blast radius.** Where one test body runs over several inputs or several
+   implementations, breaking A must fail A's cases and leave B's passing. Table-driven
+   subtests in Go, one `describe` per implementation in Jest, a parametrised case in
+   pytest: three names for the shape this step needs, and each reports its cases
+   separately. Wrong radius means the test is measuring something other than what its name
+   says.
 5. **Revert the mutation** and confirm the suite is green again. Always. A mutation left
    behind is a broken repository.
 
@@ -43,20 +49,20 @@ this loop again on the fixed test.
 
 Smallest, at the seam, one at a time.
 
-- Stub a function to return an empty result, a constant, or `None`.
+- Return an empty collection, a constant, or a null from one function.
 - Invert a single comparison or drop a single filter.
 - Delete one branch of the behaviour the test names.
 
-Do not mutate configuration, imports, or a shared base class to break a specific test.
-Those produce failures everywhere and prove nothing about this test.
+Do not mutate configuration, build settings, imports, or a shared base class to break a
+specific test. Those produce failures everywhere and prove nothing about this test.
 
 ## When a surviving test is correct
 
 Not every test that survives a mutation is decorative. A test can legitimately pass under
-a break that is outside what it asserts. Stubbing a search function to return nothing
-leaves `test_empty_query_returns_nothing` passing, and that is correct: the test asserts
-emptiness, and emptiness is what it got. It would still fail if the function returned
-something for an empty query, which is the failure it exists to catch.
+a break that is outside what it asserts. Stub a function to return nothing and a test
+asserting that it returns nothing for a degenerate input keeps passing, and that is
+correct: the test asserts emptiness, and emptiness is what it got. It would still fail if
+the function returned something for that input, which is the failure it exists to catch.
 
 The question is never "did this test survive" but "can this test fail for the reason it
 exists". Verify a surviving test with a mutation aimed at its own claim.
@@ -76,7 +82,8 @@ exists". Verify a surviving test with a mutation aimed at its own claim.
 
 Name the mutation, the cases that failed, and the cases that did not:
 
-> Stubbed `lexical.search` to return `[]`. Exactly 10 `[lexical]` cases failed, zero
-> `[bm25]`. Reverted, suite green.
+> Made `RedisCache.get` return `undefined` unconditionally. All 8 cases in the `redis`
+> describe of `cache contract` failed; the 8 `memory` cases passed and nothing else moved.
+> Reverted, `vitest run` green.
 
 That is evidence. "50 tests pass" is not.

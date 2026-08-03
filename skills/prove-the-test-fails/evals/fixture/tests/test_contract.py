@@ -1,26 +1,25 @@
-"""The suite guarding the two retrieval strategies."""
+"""The suite guarding the two route matchers."""
 
 import pytest
+from routing import regex_router, segment_router
 
-from retrieval import bm25_search, lexical_search
-
-STRATEGIES = {"bm25": bm25_search, "lexical": lexical_search}
-
-
-@pytest.mark.parametrize("strategy", sorted(STRATEGIES))
-def test_finds_a_phrase_from_the_corpus(strategy: str) -> None:
-    results = STRATEGIES[strategy]("identifier")
-    assert [evidence.chunk_id for evidence in results] == [2]
+ROUTERS = {"regex": regex_router, "segment": segment_router}
 
 
-@pytest.mark.parametrize("strategy", sorted(STRATEGIES))
-def test_empty_query_returns_nothing(strategy: str) -> None:
-    assert STRATEGIES[strategy]("") == []
+@pytest.mark.parametrize("router", sorted(ROUTERS))
+def test_matches_a_route_with_a_parameter(router: str) -> None:
+    matches = ROUTERS[router]("/users/42")
+    assert [match.route_id for match in matches] == [2]
 
 
-def test_strategies_satisfy_the_same_contract() -> None:
-    """Both strategies return the same kind of result for the same query."""
-    query = "embeddings"
-    assert {type(evidence) for evidence in lexical_search(query)} == {
-        type(evidence) for evidence in bm25_search(query)
+@pytest.mark.parametrize("router", sorted(ROUTERS))
+def test_empty_path_matches_nothing(router: str) -> None:
+    assert ROUTERS[router]("") == []
+
+
+def test_routers_satisfy_the_same_contract() -> None:
+    """Both routers return the same kind of result for the same path."""
+    path = "/orders/7"
+    assert {type(match) for match in regex_router(path)} == {
+        type(match) for match in segment_router(path)
     }
