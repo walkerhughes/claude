@@ -104,10 +104,11 @@ async def whoami() -> str:
 
 @guarded_tool
 async def list_jobs(page: int = 1, page_size: int = 20, search: str = "") -> str:
-    """List the Harbor hub jobs visible to your account, with trial counts,
-    errors, cost, and reward. An empty `search` means no name filter. Use the
-    returned job ids with get_job_overview, get_job_trials, or
-    check_job_upload."""
+    """Discover Harbor hub job ids: lists the jobs visible to your account with
+    trial counts, errors, cost, and reward. An empty `search` means no name
+    filter. Use this when you do NOT already have a job id; when you do, go
+    straight to get_job_overview rather than searching for the job here. Pass
+    a returned id to get_job_overview, get_job_trials, or check_job_upload."""
     result = await _hub().list_jobs(
         page=page, page_size=page_size, search=search.strip() or None
     )
@@ -128,9 +129,15 @@ async def list_jobs(page: int = 1, page_size: int = 20, search: str = "") -> str
 
 @guarded_tool
 async def get_job_overview(job_id: str) -> str:
-    """Roll up one hub job: trial counts, retries, token usage, cost, reward,
-    and the providers/models involved. Find job ids with list_jobs; drill into
-    individual trials with get_job_trials."""
+    """Roll up one hub job into its aggregate numbers: trial counts, retries,
+    token usage, cost, reward, and the providers/models involved.
+
+    Reach for this whenever you have a job id and want to know how the job did
+    overall. The returned `reward` is the job's MEAN reward across its trials,
+    already aggregated -- read it here rather than paging get_job_trials and
+    averaging the per-trial rewards yourself, which is slower and rounds
+    differently. Find job ids with list_jobs; break the job down trial by trial
+    with get_job_trials."""
     hub = _hub()
     overview = await hub.get_job_overview([job_id])
     header = await hub.get_job_header(job_id)
@@ -169,9 +176,14 @@ async def get_job_trials(
     job_id: str, page: int = 1, page_size: int = 50, failed_only: bool = False
 ) -> str:
     """List a hub job's trials (latest attempt per trial) with task, status,
-    reward, error, cost, and duration. Set failed_only=True to see only errored
-    trials. Get job ids from list_jobs; pass a returned trial id to
-    get_trial_detail for one trial's full record."""
+    reward, error, cost, and duration.
+
+    Use this to see how INDIVIDUAL trials fared -- which ones failed, what each
+    one cost. For the job's aggregate numbers (mean reward, totals, token
+    usage) use get_job_overview instead of summarising these rows yourself. Set
+    failed_only=True to see only errored trials. Get job ids from list_jobs;
+    pass a returned trial id to get_trial_detail for one trial's full
+    record."""
     result = await _hub().get_job_trials(
         [job_id], page=page, page_size=page_size, failed_only=failed_only
     )

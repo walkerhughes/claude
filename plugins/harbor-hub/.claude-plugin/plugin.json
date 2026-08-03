@@ -1,6 +1,6 @@
 {
   "name": "harbor-hub",
-  "version": "0.6.0",
+  "version": "0.8.1",
   "description": "MCP server for the Harbor hub: inspect evaluation jobs, trials, and uploads; publish tasks and datasets when writes are enabled.",
   "author": {
     "name": "Walker Hughes"

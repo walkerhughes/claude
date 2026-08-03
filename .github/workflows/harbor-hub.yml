@@ -67,3 +67,57 @@ jobs:
           python-version: "3.12"
       - run: uv sync --dev --extra modal
       - run: make test-e2e
+
+  evals:
+    # THE MERGE GATE on the MCP capability surface: drives the evals with the
+    # real claude-code agent and fails unless every reward is 1.0 -- outcome
+    # (the answer, self-truthed from the hub) and process (the answer came
+    # through the MCP tools, not a harbor CLI shortcut).
+    #
+    # Unlike every other job here this one costs Anthropic tokens, so it is
+    # last and narrowly triggered. It needs the hub key, Modal, and Anthropic
+    # together; a fork PR gets no secrets, hence the same-repo guard as e2e.
+    #
+    # HARBOR_MCP_REF makes the eval images pip-install harbor-mcp from the
+    # commit under review instead of main. Without it the gate builds main's
+    # server and passes a PR that breaks the MCP -- a green check that means
+    # nothing. On a push to main the head sha IS main.
+    runs-on: ubuntu-latest
+    needs: [lint-unit]
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    env:
+      HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      HARBOR_TEST_ENV: modal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev --extra modal
+      # run_evals.sh calls the bare `harbor` console script from the venv.
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Run the eval gate (claude-code)
+        env:
+          # The PR's merge commit is not on the remote, so pip could not fetch
+          # it; head.sha is the branch tip and is pushed.
+          HARBOR_MCP_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
+          # Push to main only. PR runs would mint a hub job per push with
+          # nothing to clean them up; main's runs are the ones worth keeping a
+          # reward/cost/token trend for.
+          EVALS_UPLOAD: ${{ github.event_name == 'push' && '1' || '' }}
+        run: make evals
+      # A `process` failure is only diagnosable from the agent's trajectory:
+      # the score alone cannot distinguish a tool-name mismatch from a real
+      # CLI shortcut. Keep the trials so the next step is reading them, not
+      # re-running the gate.
+      - name: Upload trials for diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-trials
+          path: ${{ runner.temp }}/eval-trials
+          retention-days: 7
