@@ -15,6 +15,13 @@
       "name": "tastytrade",
       "source": "./plugins/tastytrade",
       "description": "Inspect TastyTrade brokerage accounts, positions, market data, option chains, and transactions from Claude Code. Order placement is gated off by default."
+    },
+    {
+      "name": "parallel-agent-isolation",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/parallel-agent-isolation"],
+      "description": "Decide what stateful resources concurrent agents will share, and pick isolation, serialisation, or serial re-verification before dispatching them."
     }
   ]
 }
