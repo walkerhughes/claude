@@ -2,12 +2,12 @@
 
 Two skills for writing in your own voice.
 
-**`be-human`** is the general one: plain language, answer first, no filler, no
+**`humanoid`** is the general one: plain language, answer first, no filler, no
 em dashes. It applies immediately after install, with nothing to set up. Say
-"be human", ask for something in plain English, or tell Claude a response was
+"humanoid", ask for something in plain English, or tell Claude a response was
 too jargon-heavy.
 
-**`persona`** is the personal one. It learns *your* voice from your own writing
+**`me`** is the personal one. It learns *your* voice from your own writing
 and builds a translation skill specific to you. That takes about ten minutes of
 labeling, described below.
 
@@ -24,7 +24,7 @@ times, the skill is done.
 ### Use
 
 ```
-/persona
+/me
 ```
 
 That's it. Claude drives the whole loop and tells you what to do at each step.
@@ -33,11 +33,11 @@ Saying "learn my voice" or "make this sound like me" triggers the same skill.
 Point it at writing outside your transcripts, which is worth doing:
 
 ```
-/persona ~/notes ~/drafts
+/me ~/notes ~/drafts
 ```
 
 Expect to spend about ten minutes labeling. You can stop partway and resume:
-`/persona` picks up where you left off.
+`/me` picks up where you left off.
 
 Output lands in `~/.claude/skills/persona-voice/SKILL.md`, which Claude then
 uses automatically whenever you ask for text in your voice. Labels live in

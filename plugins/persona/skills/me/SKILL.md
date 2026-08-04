@@ -1,9 +1,9 @@
 ---
-name: persona
-description: Learn the user's writing voice from their own Claude Code transcripts and build a skill that translates Claude's output into it. Runs a local labeling UI where the user critiques examples, then an adversarial round where they guess which passages a subagent wrote. Use when the user says "learn my voice", "match my style", "sound like me", "build my persona", "write like I write", or invokes /persona.
+name: me
+description: Learn the user's writing voice from their own Claude Code transcripts and build a skill that translates Claude's output into it. Runs a local labeling UI where the user critiques examples, then an adversarial round where they guess which passages a subagent wrote. Use when the user says "learn my voice", "match my style", "sound like me", "build my persona", "write like I write", or invokes /me.
 ---
 
-# Persona
+# Me
 
 Build a translation skill: Claude's phrasing in, the user's phrasing out. The
 loop is generator/discriminator. You write the skill, isolated subagents use it

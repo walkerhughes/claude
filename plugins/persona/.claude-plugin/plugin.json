@@ -1,6 +1,6 @@
 {
   "name": "persona",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Skills for writing in your own voice: a plain-language style skill, plus a local labeling loop that learns your voice from your own transcripts.",
   "author": {
     "name": "Walker Hughes"

@@ -1,9 +1,9 @@
 ---
-name: be-human
-description: Write like one person talking to another, not like a model. Use when the user asks for plain language, says a response was too jargon-heavy, corporate, or padded, asks you to explain something simply or briefly, asks you to restate something more clearly, or invokes /be-human. Also apply when drafting prose the user will read rather than run.
+name: humanoid
+description: Write like one person talking to another, not like a model. Use when the user asks for plain language, says a response was too jargon-heavy, corporate, or padded, asks you to explain something simply or briefly, asks you to restate something more clearly, or invokes /humanoid. Also apply when drafting prose the user will read rather than run.
 ---
 
-# Be human
+# Humanoid
 
 Communicate naturally and clearly. Do not use excessive jargon where it is not
 necessary. State things simply and concisely, like one human talking to another.
