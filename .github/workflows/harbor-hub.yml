@@ -162,8 +162,15 @@ jobs:
       # the score alone cannot distinguish a tool-name mismatch from a real
       # CLI shortcut. Keep the trials so the next step is reading them, not
       # re-running the gate.
+      #
+      # always(), not failure(): a green run is the other case that needs
+      # evidence. Harbor draws progress as a live TUI, so a run that passes
+      # slowly logs nothing between "Running all evals" and the result table --
+      # one took 9m51s against a 2m04s baseline and left no way to tell an
+      # image rebuild from throttled rollouts. PR runs do not --upload, so this
+      # artifact is the only record they produce.
       - name: Upload trials for diagnosis
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: eval-trials
