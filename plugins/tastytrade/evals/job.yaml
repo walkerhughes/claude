@@ -1,15 +1,16 @@
-# Run Claude Code against both the baseline (main) and candidate (refactor) servers over the
-# same tasks. The server to use lives on each agent config, so one job covers both. Harbor
-# records the reward, phase timings, and token and cost totals per trial. Compare with
-# `harbor view jobs`.
+# Run Claude Code against the server over every task. Harbor records the reward, phase
+# timings, and token and cost totals per trial. Read them with `harbor view jobs`.
 #
-# Before running, from inside the evals/ directory (so the task path resolves the same way
-# across Harbor versions):
-#   docker build -t tastytrade-bench environment
+# This ran two agents once, a baseline ref and a candidate ref, to show the refactor beat
+# the endpoint-wrapper baseline. The refactor landed and the candidate branch is gone, so
+# there is one agent now and the job is a regression gate rather than a comparison.
+#
+# Before running:
+#   make benchmark-build          # from the plugin root
 #   export ANTHROPIC_API_KEY=...
-#   harbor run -c job.yaml
+#   make benchmark
 jobs_dir: jobs
-n_attempts: 3 # trials per task per agent
+n_attempts: 3 # trials per task
 
 orchestrator:
   type: local
@@ -17,8 +18,13 @@ orchestrator:
 
 environment:
   type: docker
-  env:
-    - "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+# No ANTHROPIC_API_KEY here on purpose. The agent authenticates with
+# CLAUDE_CODE_OAUTH_TOKEN, which harbor's claude-code agent forwards when
+# CLAUDE_FORCE_OAUTH is set. Declaring the key put an empty ANTHROPIC_API_KEY in
+# the container, the CLI preferred it over the token (apiKeySource:
+# ANTHROPIC_API_KEY), and every trial died on a 401 before spending a token.
+# Adding it back on a machine that has one also silently moves the run onto API
+# credits.
 
 agents:
   - name: claude-code
@@ -26,13 +32,7 @@ agents:
     mcp_servers:
       - name: tastytrade
         transport: stdio
-        command: mcp-baseline # the plain endpoint-wrapper baseline
-  - name: claude-code
-    model_name: anthropic/claude-haiku-4-5-20251001
-    mcp_servers:
-      - name: tastytrade
-        transport: stdio
-        command: mcp-candidate # this server
+        command: mcp-server
 
 datasets:
   - path: ./tasks

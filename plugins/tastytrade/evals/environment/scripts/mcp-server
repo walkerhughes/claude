@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Launch the server over stdio against the mock API.
+#
+# cd rather than `uv run --project`: the image's WORKDIR is /app so the agent writes its
+# answer there, and `src` is only importable from the project root. --project alone sets
+# the environment without moving the working directory, which is why this failed with
+# ModuleNotFoundError until the image was actually built and run.
+set -euo pipefail
+require-local-api
+start-mock
+cd /opt/tastytrade
+exec uv run python -m src.server

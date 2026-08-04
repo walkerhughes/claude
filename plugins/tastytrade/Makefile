@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix format typecheck check selftest test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
+.PHONY: lint lint-fix format typecheck check selftest evals test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
 
 lint:
 	uv run ruff check .
@@ -38,6 +38,13 @@ install-hooks:
 validate-tasks:
 	uv run python evals/generate_tasks.py
 	bash evals/validate_local.sh
+	python3 evals/check_reward.py --selftest
+
+# THE MERGE GATE: drives the tasks with a real agent. Spends model tokens, needs
+# Docker and CLAUDE_CODE_OAUTH_TOKEN. validate-tasks proves the verifiers work;
+# only this proves an agent can actually drive the server and the skill.
+evals:
+	bash evals/run_gate.sh
 
 # Run the mock Tastytrade API on its own, the way the eval benchmark runs it.
 mock-api:
@@ -45,12 +52,14 @@ mock-api:
 
 # Benchmark targets (need Docker running and ANTHROPIC_API_KEY set). These cd into evals/ so
 # Harbor resolves the task path correctly regardless of where you invoke make, and call Harbor
-# through uv so it does not need to be on PATH. The version is pinned to the one the tasks were
-# validated against. Override with e.g. HARBOR=harbor to use a different harbor.
-HARBOR ?= uv tool run --from "harbor==0.13.2" harbor
+# through uv so it does not need to be on PATH. Pinned to 0.18.0, matching harbor-hub: 0.13.2's
+# --upload wanted a `harbor auth login` credentials file and ignored HARBOR_API_KEY, so the CI
+# gate could not upload. Override with e.g. HARBOR=harbor to use a different harbor.
+HARBOR ?= uv tool run --from "harbor==0.18.0" harbor
 
+# Context is the plugin root so the image can copy the working tree it is testing.
 benchmark-build:
-	docker build -t tastytrade-bench evals/environment
+	docker build -f evals/environment/Dockerfile -t tastytrade-bench .
 
 benchmark:
 	cd evals && $(HARBOR) run -c job.yaml

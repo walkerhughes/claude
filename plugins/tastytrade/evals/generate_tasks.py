@@ -8,6 +8,7 @@ away from the data the agent actually sees. Change a fixture in
 Run: python evals/generate_tasks.py
 """
 
+import importlib.util
 import json
 import os
 import stat
@@ -53,6 +54,27 @@ def _latest_dividend():
 def _watchlist_symbols():
     entries = fx.WATCHLIST_DETAIL["My Tech"]["data"]["watchlist-entries"]
     return [e["symbol"] for e in entries]
+
+
+# The reference chain the earnings-calendars skill ships. Loading the skill's own module
+# keeps the same invariant as the fixture tasks: the expected answer is computed by the
+# code under test, so it cannot drift away from what the agent will see.
+SKILL_CHAIN = os.path.join(ROOT, "skills", "earnings-calendars", "reference", "pltr-2026-08-03.json")
+
+
+def _calendars_module():
+    spec = importlib.util.spec_from_file_location("calendars", os.path.join(ROOT, "scripts", "calendars.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _implied_move_pct():
+    calendars = _calendars_module()
+    with open(SKILL_CHAIN) as fh:
+        chain = calendars.Chain(json.load(fh))
+    _, _, jump = calendars.fit_term_structure(chain)
+    return round(calendars.expected_abs_move(jump) * 100, 2)
 
 
 # Each numeric task: directory name, prompt, the JSON key the agent must write, the value
@@ -201,6 +223,26 @@ mkdir -p "$APP_DIR"
 echo '{{"{key}": {expected}}}' > "$APP_DIR/answer.json"
 """
 
+# The skill task deliberately does not name the script or the skill. The point is whether
+# the agent recognises an earnings-vol question and reaches for the right tool on its own,
+# so naming it would test only that the agent can copy a command out of a prompt.
+SKILL_INSTRUCTION = """\
+# Task: {title}
+
+PLTR reports earnings after the close today. A snapshot of its option chain, taken that
+afternoon, is saved at:
+
+    {chain}
+
+{instruction}
+
+Write it to `/app/answer.json` as a single JSON object with this shape, and nothing else:
+
+```json
+{{"{key}": <number>}}
+```
+"""
+
 CSV_INSTRUCTION = """\
 # Task: {title}
 
@@ -247,12 +289,26 @@ mkdir -p "$APP_DIR"
 echo '{json_line}' > "$APP_DIR/answer.json"
 """
 
+# The sandbox sentence is load-bearing and true. Without it the first gate run
+# stalled here: the agent read "place a market order" as a real financial
+# transaction and stopped to ask for confirmation, which is the right instinct
+# and the wrong outcome for a single-turn eval. Stating the environment is a
+# mock removes a false safety concern rather than talking the agent past a real
+# one, and the task still exercises the same place_order path.
 ORDER_INSTRUCTION = """\
 # Task: Place an Order
+
+This is an automated test against a mock brokerage API. There is no real account, no real
+money, and no real market: orders are recorded to a local file and go nowhere else. Treat
+this as a sandbox and do not stop to ask for confirmation.
 
 Place a market order to buy 5 shares of AAPL in my account, and make sure it is actually
 transmitted, not just previewed. Trading is enabled on this server. You do not need to write
 any file; the brokerage records the submitted order.
+
+Use the Tastytrade MCP tools. Do not call the brokerage's HTTP API directly and do not edit
+its files: the point is to exercise the tools, and an order placed any other way does not
+count.
 """
 
 # The verifier reads the order the mock recorded, so it checks the order the agent really
@@ -363,6 +419,45 @@ def generate() -> list[str]:
     _write(
         os.path.join(base, "solution", "solve.sh"),
         CSV_SOLVE.format(json_line=json.dumps({"symbols": _watchlist_symbols()})),
+        executable=True,
+    )
+    names.append(name)
+
+    # Earnings-calendar skill: the one task that exercises a skill rather than the MCP
+    # tools. The chain is a file in the image, so the answer is fixed and no market data
+    # is involved.
+    name = "earnings-implied-move"
+    base = os.path.join(TASKS_DIR, name)
+    key = "implied_expected_move_pct"
+    expected = _implied_move_pct()
+    # "Implied move" alone has two defensible readings, and the first gate run
+    # answered the other one: the agent priced the front straddle and reported
+    # 11.34% against an expected 10.52%. The front expiry carries four days of
+    # ordinary volatility on top of the event, so the straddle overstates the
+    # event itself. Saying that isolates the question without naming the skill,
+    # which is still the thing being measured.
+    instruction = (
+        "From that chain, find the implied expected absolute move for the earnings event "
+        "itself, as a percent of the spot price. Isolate the event: the front expiry also "
+        "carries ordinary day-to-day volatility, and that part is not the answer."
+    )
+    chain_in_image = "/opt/tastytrade/skills/earnings-calendars/reference/pltr-2026-08-03.json"
+    _write(
+        os.path.join(base, "task.toml"),
+        TASK_TOML.format(name=name, desc="Find PLTR's implied expected earnings move from a saved option chain."),
+    )
+    _write(
+        os.path.join(base, "instruction.md"),
+        SKILL_INSTRUCTION.format(title=_title(name), instruction=instruction, key=key, chain=chain_in_image),
+    )
+    _write(
+        os.path.join(base, "tests", "test.sh"),
+        NUMERIC_TEST.format(key=key, expected=expected, tol=0.5),
+        executable=True,
+    )
+    _write(
+        os.path.join(base, "solution", "solve.sh"),
+        NUMERIC_SOLVE.format(key=key, expected=expected),
         executable=True,
     )
     names.append(name)

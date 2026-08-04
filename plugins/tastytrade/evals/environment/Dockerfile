@@ -1,8 +1,17 @@
 # Benchmark agent environment.
 #
-# Provides two checkouts of the server, the baseline (main) and the candidate
-# (mcp-server-refactor), plus the mock Tastytrade API, so Claude Code can be benchmarked
-# against each one over the same tasks. Harbor installs the claude-code agent itself.
+# One checkout of the server plus the mock Tastytrade API, so Claude Code can be
+# benchmarked over the eval tasks. Harbor installs the claude-code agent itself.
+#
+# This used to build two checkouts and compare a baseline ref against a candidate
+# ref. That comparison existed to show the refactored server beat the plain
+# endpoint-wrapper baseline. The refactor landed on main, the candidate branch was
+# deleted, and the image stopped building. There is no second side left to compare
+# against, so the split is gone and the evals are now a regression gate on one
+# server rather than a bake-off between two.
+#
+# Build context is the plugin root, not this directory:
+#   make benchmark-build     # docker build -f evals/environment/Dockerfile .
 FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates \
@@ -11,35 +20,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-cer
 # uv for dependency management (matches the project toolchain).
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# BROKEN, needs a decision before `make benchmark` can build again.
-#
-# This image compares a baseline ref against a candidate ref. CANDIDATE_REF names
-# `mcp-server-refactor`, a branch that no longer exists, so the clone below fails.
-# The old default REPO also pointed at walkerhughes/tastytrade-mcp, which was
-# consolidated into this monorepo and last received a commit in June.
-#
-# The repo and subdirectory are corrected here, but the two-ref comparison itself
-# no longer has a second ref to compare against. Pick one:
-#   - point CANDIDATE_REF at a tag or commit worth benchmarking against main, or
-#   - drop the baseline/candidate split and benchmark a single checkout.
-# Nothing in CI exercises this path (`make validate-tasks` does not build the
-# image), which is why it went unnoticed.
-ARG REPO=https://github.com/walkerhughes/claude
-ARG BASELINE_REF=main
-ARG CANDIDATE_REF=mcp-server-refactor
+# The server under test is the working tree rather than a cloned ref. A clone only
+# ever measured what had already been pushed, which is how the stale-branch breakage
+# went unnoticed; copying measures the code actually in front of you.
+COPY . /opt/tastytrade
+RUN cd /opt/tastytrade && (uv sync --frozen || uv sync)
 
-# Both checkouts. The mock API and fixtures live in the candidate checkout and serve both.
-RUN git clone --depth 1 --branch ${BASELINE_REF} ${REPO} /opt/mcp-baseline \
-    && git clone --depth 1 --branch ${CANDIDATE_REF} ${REPO} /opt/mcp-candidate
-RUN cd /opt/mcp-baseline/plugins/tastytrade && uv sync --frozen || uv sync
-RUN cd /opt/mcp-candidate/plugins/tastytrade && uv sync --frozen || uv sync
+# Claude Code discovers personal skills here. Installing the skill lets a task
+# exercise the real trigger path instead of naming the script in its prompt.
+# Every task image is FROM this one, so the agent container gets it too. Harbor
+# also has a --skills flag that mounts a directory; this stays in the image
+# because it can be verified with a plain `docker run`, and that flag cannot.
+RUN mkdir -p /root/.claude/skills \
+    && cp -r /opt/tastytrade/skills/earnings-calendars /root/.claude/skills/earnings-calendars
 
-COPY scripts/ /usr/local/bin/
-RUN chmod +x /usr/local/bin/require-local-api /usr/local/bin/start-mock \
-    /usr/local/bin/mcp-baseline /usr/local/bin/mcp-candidate
+COPY evals/environment/scripts/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/require-local-api /usr/local/bin/start-mock /usr/local/bin/mcp-server
 
 WORKDIR /app
-# Both servers talk to the mock API with throwaway credentials. require-local-api also
+# The server talks to the mock API with throwaway credentials. require-local-api also
 # enforces the localhost target at startup, so the benchmark can never reach a real account.
 ENV API_BASE_URL=http://localhost:8080 \
     TT_CLIENT_ID=test \

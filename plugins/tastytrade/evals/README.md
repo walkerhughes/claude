@@ -1,10 +1,13 @@
 # Evals
 
-The server is evaluated at the agent-loop level. Claude Code drives the tools over a set of
-tasks, once against the baseline server (`main`) and once against the candidate server
-(`mcp-server-refactor`), using the [Harbor](https://github.com/laude-institute/harbor)
-framework. The agent is the same in both runs and only the MCP server changes, so any
-difference in success rate, tool calls, tokens, or latency comes from the server itself.
+The server is evaluated at the agent-loop level: Claude Code drives the tools over a set of
+tasks using the [Harbor](https://github.com/laude-institute/harbor) framework, and each trial
+records reward, tool calls, tokens, and latency.
+
+This used to run two agents, a baseline ref and a candidate ref, to show the refactored server
+beat the plain endpoint-wrapper baseline. That refactor landed on main and the candidate branch
+was deleted, which left the image cloning a ref that no longer existed. There is no second side
+to compare against now, so the job runs one server and the evals serve as a regression gate.
 
 Every task runs against the mock Tastytrade API in `tests/fixtures/mock_api`, so the answers
 are fixed and reproducible and no run touches a real account or live market data. The fast
@@ -16,30 +19,39 @@ in `tests/unit/test_misuse_evals.py`.
 ```
 evals/
   environment/
-    Dockerfile            # python and uv, both server checkouts, the mock API
-    scripts/              # require-local-api, start-mock, mcp-baseline, mcp-candidate
+    Dockerfile            # python, uv, the server checkout, the skill, the mock API
+    scripts/              # require-local-api, start-mock, mcp-server
   tasks/<name>/
     task.toml             # task config
     instruction.md        # the prompt the agent sees
     tests/test.sh         # verifier, writes a reward to /logs/verifier/reward.txt
     solution/solve.sh     # oracle, writes the known-correct answer
-  job.yaml                # runs the baseline and candidate agents over every task
+  job.yaml                # runs the agent over every task
   generate_tasks.py       # regenerates the tasks from the fixtures
   validate_local.sh       # checks every verifier without Harbor or Docker
 ```
 
-## Tasks (12)
+## Tasks (13)
 
 Ten tasks ask for a single number (portfolio P/L, largest drawdown, ATM strike, IV rank,
 total fees, net cash, latest dividend, net liquidating value, position count, and the fees on
-a previewed vertical spread). One asks for the symbols in a watchlist. The last asks the agent
+a previewed vertical spread). One asks for the symbols in a watchlist. One asks the agent
 to place an order, and its verifier reads the order the mock recorded rather than a file the
 agent wrote.
 
+The last, `earnings-implied-move`, is the only one that exercises a skill rather than the MCP
+tools. It points the agent at the option chain that `earnings-calendars` ships and asks for the
+implied expected earnings move, which is 10.52% for that chain. The prompt names neither the
+skill nor the script, so it measures whether the agent recognises an earnings-vol question and
+reaches for the right tool. The image installs the skill at `/root/.claude/skills` so the normal
+trigger path is live.
+
 Nothing in the tasks is hand-typed. `generate_tasks.py` computes every expected answer from
 the mock fixtures by running the same shaping code the server uses, so a task can never
-disagree with the data the agent sees. The two anchor values are a total unrealized P/L of
-+$700 and an SPY ATM strike of 200. Regenerate after changing a fixture:
+disagree with the data the agent sees. The skill task follows the same rule: its answer comes
+from importing `scripts/calendars.py` and fitting the shipped chain. The two anchor values are
+a total unrealized P/L of +$700 and an SPY ATM strike of 200. Regenerate after changing a
+fixture:
 
 ```bash
 python evals/generate_tasks.py
@@ -53,7 +65,7 @@ repo root:
 
 ```bash
 export ANTHROPIC_API_KEY=...
-make benchmark-build    # docker build -t tastytrade-bench evals/environment
+make benchmark-build    # docker build -f evals/environment/Dockerfile -t tastytrade-bench .
 make benchmark          # cd evals && harbor run -c job.yaml
 make benchmark-view     # cd evals && harbor view jobs
 ```
@@ -62,10 +74,10 @@ Or run Harbor directly, from inside `evals/`. Call it through `uv` and pin the v
 tasks were validated against, so it doesn't depend on what's on your PATH:
 
 ```bash
+docker build -f evals/environment/Dockerfile -t tastytrade-bench .
 cd evals
-docker build -t tastytrade-bench environment
-uv tool run --from "harbor==0.13.2" harbor run -c job.yaml
-uv tool run --from "harbor==0.13.2" harbor view jobs
+uv tool run --from "harbor==0.18.0" harbor run -c job.yaml
+uv tool run --from "harbor==0.18.0" harbor view jobs
 ```
 
 Each task carries a one-line `environment/Dockerfile` (`FROM tastytrade-bench`). Harbor only
@@ -75,8 +87,37 @@ they inherit.
 
 The tasks reference the image by name (`docker_image = "tastytrade-bench"`), so build it
 before the first run. Each trial's `result.json` records the reward, the phase timings, and
-the token and cost totals, so success rate, tokens, tool calls, and latency per server come
-straight out of the job directory.
+the token and cost totals, so success rate, tokens, tool calls, and latency come straight out
+of the job directory.
+
+The image copies the working tree rather than cloning a ref, so a run measures the code you
+have checked out. Rebuild after changing the server or the skill.
+
+## The merge gate
+
+`make validate-tasks` and `make evals` answer different questions, and CI runs both.
+`validate-tasks` proves each verifier accepts its oracle and rejects an empty answer, with no
+model involved, which catches a broken verifier. `make evals` drives all 13 tasks with the
+real claude-code agent and fails unless every reward is 1.0, which is the only thing that
+catches a server or skill an agent cannot actually drive.
+
+The gate authenticates with `CLAUDE_CODE_OAUTH_TOKEN` so runs bill to a Claude subscription
+rather than API credits. It deliberately does **not** accept `ANTHROPIC_API_KEY`: with a key
+present the CLI prefers it over the token, which either moves the run onto credits silently or,
+if the key is empty, 401s every trial before spending a token. `job.yaml` used to declare the
+key for exactly this reason and no longer does.
+
+Every gate run uploads to the Harbor hub as **`ci-evals-tastytrade`**, one job per CI run
+holding all 13 tasks as trials. That follows the repo-wide `ci-evals-<plugin>` convention, so
+every plugin's CI history is searchable together instead of hiding behind a generic job name.
+
+PR runs upload too. Restricting uploads to main left a PR gate with nothing on the hub, so the
+only record was a CI artifact that expires after 7 days.
+
+```bash
+export CLAUDE_CODE_OAUTH_TOKEN=...   # claude setup-token
+make evals                           # add HARBOR_API_KEY and EVALS_UPLOAD=1 to upload
+```
 
 ## Check the verifiers without Harbor
 
@@ -86,7 +127,7 @@ reward is 0. This is the local stand-in for `harbor run -a oracle`:
 
 ```bash
 bash evals/validate_local.sh
-# 12 passed, 0 failed
+# 13 passed, 0 failed
 ```
 
 ## Safety
