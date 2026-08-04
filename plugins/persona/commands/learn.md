@@ -1,5 +1,5 @@
 ---
-description: Learn my writing voice through a labeling loop, and build a skill that translates Claude's output into it.
+description: Learn the user's writing voice through a labeling loop, and build a skill that translates Claude's output into it.
 ---
 
 Run the voice-learning loop using the `learn` skill.
