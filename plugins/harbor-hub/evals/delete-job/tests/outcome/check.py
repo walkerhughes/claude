@@ -43,17 +43,30 @@ def job_gone_from_hub(workspace: Path) -> bool:
         capture_output=True,
         text=True,
     )
+    # A missing job is not an error to the CLI: it exits 0 with `{}`. So a
+    # nonzero exit, or output that will not parse, is the hub or the network,
+    # never a verdict on the job. Returning False there would report "the job
+    # is still on the hub" -- the agent failed -- for an infra blip. Raise so
+    # the trial errors and names the real cause. Unreachable for an agent that
+    # wrote no answer: answer_says_deleted carries that case, and this
+    # criterion returns above without a job id.
     if proc.returncode != 0:
-        return False
+        raise RuntimeError(
+            f"could not check whether job {job_id!r} is gone: "
+            f"`harbor hub job show` exited {proc.returncode}: {proc.stderr.strip()}"
+        )
     try:
         payload = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return False
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"could not check whether job {job_id!r} is gone: "
+            f"`harbor hub job show` returned unparseable JSON: {exc}"
+        ) from exc
     # A deleted (or never-existent) job returns an empty object; a live job
     # carries a "stats" block. Treat empty/absent as gone.
     return not payload or not payload.get("stats")
 
 
+# Only file_exists is registered here -- a zero-arg @criterion self-registers
+# at decoration time, so calling it again would score it twice.
 criteria.file_exists("answer.txt")
-criteria.answer_says_deleted()
-criteria.job_gone_from_hub()

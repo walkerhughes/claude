@@ -59,5 +59,6 @@ def no_harbor_cli(workspace: Path) -> bool:
     return True
 
 
+# no_harbor_cli is not registered here: a zero-arg @criterion self-registers at
+# decoration time, so calling it again would score it twice.
 criteria.trajectory_tool_used("mcp__harbor-hub__delete_job", path=TRAJECTORY)
-criteria.no_harbor_cli()

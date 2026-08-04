@@ -43,8 +43,28 @@ def answer_matches_published_truth(workspace: Path) -> bool:
             capture_output=True,
             text=True,
         )
-    return answer == ("yes" if proc.returncode == 0 else "no")
+
+    # Exit 0 is published; an unpublished ref exits nonzero and says so on
+    # stderr ("Error: Package 'org/name' not found"). Any other failure is the
+    # hub or the network, not an answer -- scoring it as "not published" would
+    # mark a correct "yes" wrong, which is a red gate that reads as an agent or
+    # MCP defect. Raise so the trial errors and says what actually happened.
+    # Unreachable for an agent that wrote no answer: that returns above.
+    if proc.returncode == 0:
+        published = True
+    elif "not found" in proc.stderr.lower():
+        published = False
+    else:
+        raise RuntimeError(
+            f"could not determine whether {task_ref!r} is published: "
+            f"`harbor download` exited {proc.returncode}: {proc.stderr.strip()}"
+        )
+
+    return answer == ("yes" if published else "no")
 
 
+# Only file_exists is registered here. A @criterion that takes nothing but
+# `workspace` self-registers at decoration time (rewardkit session.py: `if not
+# factory_params and not shared: factory()`), so calling it again would score
+# it twice.
 criteria.file_exists("answer.txt")
-criteria.answer_matches_published_truth()
