@@ -1,50 +1,27 @@
 #!/usr/bin/env bash
-# Validate every task's verifier WITHOUT Harbor or Docker: run the oracle (solve.sh),
-# then the verifier (test.sh), and confirm it awards reward 1. Then corrupt the answer and
-# confirm the verifier awards 0. This is the local stand-in for `harbor run -a oracle`.
+# Validate every task's verifier WITHOUT Harbor and without a model: score the real
+# rewardkit checks against synthetic trajectories and assert the reward matrix
+# (see validate_in_container.sh for the table). This is the local stand-in for
+# `harbor run -a oracle`, and it catches a verifier that accepts a wrong answer
+# or, now, one that cannot tell the intended route from a bypass.
+#
+# Runs in the bench image rather than on the host: rewardkit scores these checks
+# and does not build on macOS, where its litellm dependency wants a newer rustc
+# than ships there. Using the same image CI uses also means the verifier under
+# test is the one that will really grade a gate run.
 set -euo pipefail
-cd "$(dirname "$0")/tasks"
 
-pass=0
-fail=0
-for task in */; do
-  task="${task%/}"
-  [ -f "$task/tests/test.sh" ] || continue
-  work="$(mktemp -d)"
-  export APP_DIR="$work/app"
-  export LOG_DIR="$work/logs"
-  export MOCK_STATE_FILE="$APP_DIR/placed_orders.jsonl"
-  mkdir -p "$APP_DIR" "$LOG_DIR"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-  # Captured rather than discarded: on failure these logs are the only clue, and
-  # a CI run that prints just a task name means reproducing it locally to learn
-  # anything. Kept inside $work so they are cleaned up with it.
-  bash "$task/solution/solve.sh" >"$work/oracle.log" 2>&1 || true
-  bash "$task/tests/test.sh" >"$work/verify.log" 2>&1 || true
-  reward="$(cat "$LOG_DIR/reward.txt" 2>/dev/null || echo missing)"
+die() { echo "error: $1" >&2; exit 1; }
 
-  # Negative control: an empty answer must NOT earn reward.
-  rm -rf "$APP_DIR"/* "$LOG_DIR"/* 2>/dev/null || true
-  echo '{}' > "$APP_DIR/answer.json"
-  bash "$task/tests/test.sh" >"$work/negative.log" 2>&1 || true
-  neg="$(cat "$LOG_DIR/reward.txt" 2>/dev/null || echo missing)"
+docker info > /dev/null 2>&1 \
+    || die "docker is not running (the verifiers need rewardkit, which lives in the bench image)"
 
-  if [ "$reward" = "1" ] && [ "$neg" = "0" ]; then
-    echo "PASS  $task"
-    pass=$((pass + 1))
-  else
-    echo "FAIL  $task  (oracle=$reward negative=$neg)"
-    for log in oracle verify negative; do
-      if [ -s "$work/$log.log" ]; then
-        echo "      --- $log ---"
-        sed 's/^/      /' "$work/$log.log" | tail -15
-      fi
-    done
-    fail=$((fail + 1))
-  fi
-  rm -rf "$work"
-done
+# Rebuilt every time: the checks under test are generated, so scoring a stale
+# image would report on the previous generation of tasks.
+echo "==> Building tastytrade-bench"
+docker build -q -f "$ROOT/evals/environment/Dockerfile" -t tastytrade-bench "$ROOT" > /dev/null
 
-echo
-echo "$pass passed, $fail failed"
-[ "$fail" -eq 0 ]
+echo "==> Scoring every verifier: solved / empty / bypassed"
+docker run --rm -v "$ROOT:/work:ro" tastytrade-bench bash /work/evals/validate_in_container.sh

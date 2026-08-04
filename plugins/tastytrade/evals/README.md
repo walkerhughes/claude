@@ -24,11 +24,15 @@ evals/
   tasks/<name>/
     task.toml             # task config
     instruction.md        # the prompt the agent sees
-    tests/test.sh         # verifier, writes a reward to /logs/verifier/reward.txt
+    tests/test.sh         # verifier: `rewardkit /tests`
+    tests/outcome/check.py  # reward 1: the answer is right
+    tests/process/check.py  # reward 2: it came through the MCP server (or the skill)
     solution/solve.sh     # oracle, writes the known-correct answer
   job.yaml                # runs the agent over every task
   generate_tasks.py       # regenerates the tasks from the fixtures
-  validate_local.sh       # checks every verifier without Harbor or Docker
+  check_reward.py         # gates a harbor result.json on its rewards
+  validate_local.sh       # scores every verifier without Harbor or a model
+  validate_in_container.sh  # the reward matrix it asserts
 ```
 
 ## Tasks (13)
@@ -93,6 +97,30 @@ of the job directory.
 The image copies the working tree rather than cloning a ref, so a run measures the code you
 have checked out. Rebuild after changing the server or the skill.
 
+## Two rewards per task
+
+Every task scores `outcome` and `process`, both computed by
+[rewardkit](https://pypi.org/project/harbor-rewardkit/) from the subdirectories of
+`tests/`.
+
+`outcome` is the answer. `process` is whether it came through the plugin.
+
+The split is not theoretical. The mock brokerage listens on `localhost:8080` inside the
+container and its source sits in the checkout, so an agent can produce a perfect answer
+without ever calling a tool, and a real gate run did exactly that: it searched for the MCP
+tools, never called them, read `mock_api/app.py` off disk, and drove the REST API with
+`urllib`. `outcome` alone scored that 1.0. `process` is what makes these MCP evals rather
+than answer-matching.
+
+For the twelve tool tasks, `process` asks that a `mcp__tastytrade__*` tool was called and
+that nothing reached the mock brokerage directly. For `earnings-implied-move` it asks that
+the skill or its script was used, since an agent that eyeballs the straddle can land close
+enough to pass `outcome` without loading the skill, and an early run did.
+
+Both checks fail closed. No trajectory means no evidence the intended route was taken, so
+`process` is 0. That is why the oracle scores `outcome=1, process=0`: it is a shell script,
+not an agent, and cannot call tools.
+
 ## The merge gate
 
 `make validate-tasks` and `make evals` answer different questions, and CI runs both.
@@ -121,14 +149,32 @@ make evals                           # add HARBOR_API_KEY and EVALS_UPLOAD=1 to 
 
 ## Check the verifiers without Harbor
 
-`validate_local.sh` runs each task's oracle (`solve.sh`), then its verifier (`test.sh`), and
-confirms the verifier awards a reward of 1. It then feeds an empty answer and confirms the
-reward is 0. This is the local stand-in for `harbor run -a oracle`:
+`validate_local.sh` scores every task's real verifier against three synthetic trajectories
+and asserts the whole reward matrix. No model, no Harbor, no API key:
+
+| case | answer | trajectory | outcome | process |
+|---|---|---|---|---|
+| solved | oracle | took the intended route | 1 | 1 |
+| empty | none | none | 0 | 0 |
+| bypassed | oracle | went round the server | 1 | 0 |
+
+The third row is the point, and it is what `harbor run -a oracle` cannot tell you.
 
 ```bash
-bash evals/validate_local.sh
-# 13 passed, 0 failed
+make validate-tasks
+# 39 passed, 0 failed
 ```
+
+It runs in the bench image rather than on the host, because rewardkit scores these checks
+and does not build on macOS (its litellm dependency wants a newer rustc than ships there).
+Using the same image CI uses also means the verifier under test is the one that will really
+grade a gate run, so **this needs Docker**.
+
+Writing it paid for itself immediately: it caught two bugs in the first draft of the process
+checks. An empty run scored 0.5 because "did not bypass the server" is vacuously true when
+there are no tool calls at all, and the skill check matched the reference chain's own file
+path, which contains the skill's name, so merely reading the input counted as using the
+skill.
 
 ## Safety
 
