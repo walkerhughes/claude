@@ -1,9 +1,9 @@
 ---
-name: me
-description: Learn the user's writing voice from their own Claude Code transcripts and build a skill that translates Claude's output into it. Runs a local labeling UI where the user critiques examples, then an adversarial round where they guess which passages a subagent wrote. Use when the user says "learn my voice", "match my style", "sound like me", "build my persona", "write like I write", or invokes /me.
+name: learn
+description: Learn the user's writing voice from their own Claude Code transcripts and build a skill that translates Claude's output into it. Runs a local labeling UI where the user critiques examples, then an adversarial round where they guess which passages a subagent wrote. Use when the user says "learn my voice", "match my style", "sound like me", "build my persona", "write like I write", or invokes /learn.
 ---
 
-# Me
+# Learn
 
 Build a translation skill: Claude's phrasing in, the user's phrasing out. The
 loop is generator/discriminator. You write the skill, isolated subagents use it
@@ -11,7 +11,7 @@ to produce candidates, and the user judges blind. The skill is finished when the
 user attributes **3 or more** subagent passages to themselves.
 
 `SCRIPT` below means `${CLAUDE_PLUGIN_ROOT}/scripts/persona.py`. State lives in
-`~/.claude/persona/state.json`; the output skill is `~/.claude/skills/persona-voice/SKILL.md`.
+`~/.claude/persona/state.json`; the skill it writes is `~/.claude/skills/me/SKILL.md`.
 
 Run `python3 SCRIPT status` first, at any point. It prints where the loop is and
 what to do next, so a returning user resumes rather than restarts.
@@ -55,7 +55,7 @@ python3 SCRIPT report
 
 ## 3. Draft the voice skill
 
-Read the critiques. Build `~/.claude/skills/persona-voice/SKILL.md` from what
+Read the critiques. Build `~/.claude/skills/me/SKILL.md` from what
 the user actually marked, not from your impression of their messages.
 
 Write **rules, not adjectives**. "Warm but direct" is unusable; "opens with the
@@ -71,7 +71,7 @@ Include 3-5 verbatim before/after pairs. Those do more than any rule list.
 
 Spawn one subagent per candidate, in parallel. Each subagent gets:
 
-- the current `persona-voice` skill, pasted in full
+- the current `me` skill, pasted in full
 - one neutral, Claude-sounding passage to translate
 
 Each subagent must **not** get the user's corpus. A subagent that has seen the
