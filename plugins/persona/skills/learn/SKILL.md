@@ -67,6 +67,20 @@ which words they never use.
 
 Include 3-5 verbatim before/after pairs. Those do more than any rule list.
 
+**Never put the user's name in it.** Not in the description, not in the body,
+not in the before/after labels. Write "the user" and "they" throughout. Two
+reasons: the description is matched against requests like "make this sound like
+me", where a name adds nothing and crowds out the phrases that do match, and the
+file is easy to share or commit without noticing it identifies its author. Use
+this frontmatter shape:
+
+```yaml
+---
+name: me
+description: Translate Claude-flavored prose into the user's own writing voice. Use when drafting anything that goes out under their name, or when they ask for text to "sound like me", "match my voice", or "write this how I would".
+---
+```
+
 ## 4. Generate candidates in isolation
 
 Spawn one subagent per candidate, in parallel. Each subagent gets:
