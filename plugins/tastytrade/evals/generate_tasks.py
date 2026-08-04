@@ -289,8 +289,18 @@ mkdir -p "$APP_DIR"
 echo '{json_line}' > "$APP_DIR/answer.json"
 """
 
+# The sandbox sentence is load-bearing and true. Without it the first gate run
+# stalled here: the agent read "place a market order" as a real financial
+# transaction and stopped to ask for confirmation, which is the right instinct
+# and the wrong outcome for a single-turn eval. Stating the environment is a
+# mock removes a false safety concern rather than talking the agent past a real
+# one, and the task still exercises the same place_order path.
 ORDER_INSTRUCTION = """\
 # Task: Place an Order
+
+This is an automated test against a mock brokerage API. There is no real account, no real
+money, and no real market: orders are recorded to a local file and go nowhere else. Treat
+this as a sandbox and do not stop to ask for confirmation.
 
 Place a market order to buy 5 shares of AAPL in my account, and make sure it is actually
 transmitted, not just previewed. Trading is enabled on this server. You do not need to write
@@ -416,9 +426,16 @@ def generate() -> list[str]:
     base = os.path.join(TASKS_DIR, name)
     key = "implied_expected_move_pct"
     expected = _implied_move_pct()
+    # "Implied move" alone has two defensible readings, and the first gate run
+    # answered the other one: the agent priced the front straddle and reported
+    # 11.34% against an expected 10.52%. The front expiry carries four days of
+    # ordinary volatility on top of the event, so the straddle overstates the
+    # event itself. Saying that isolates the question without naming the skill,
+    # which is still the thing being measured.
     instruction = (
-        "From that chain, find the implied expected absolute move for the earnings event, "
-        "as a percent of the spot price."
+        "From that chain, find the implied expected absolute move for the earnings event "
+        "itself, as a percent of the spot price. Isolate the event: the front expiry also "
+        "carries ordinary day-to-day volatility, and that part is not the answer."
     )
     chain_in_image = "/opt/tastytrade/skills/earnings-calendars/reference/pltr-2026-08-03.json"
     _write(
