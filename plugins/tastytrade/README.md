@@ -33,6 +33,29 @@ Authentication uses the OAuth2 refresh-token flow with automatic token refresh.
 `TT_ENABLE_TRADING=true`, **and** each call must pass `confirm=true`. Otherwise the order is not
 sent and the previewed effect is returned. Always call `preview_order` first.
 
+## Skills
+
+| Skill | What it does |
+|---|---|
+| `earnings-calendars` | Analyse an option chain for calendar spreads around an earnings event and rank them by risk-adjusted return. |
+
+`earnings-calendars` decomposes the vol term structure into base vol plus a one-time event
+jump, then prices every candidate calendar against three move regimes using real bid/ask.
+The screening rule it enforces is that a calendar only has edge if its profit band is wider
+than the implied expected move, which is usually not the case and is the point.
+
+Its analysis runs in [`scripts/calendars.py`](scripts/calendars.py), which is standard
+library only (no numpy) and self-testing:
+
+```bash
+python3 scripts/calendars.py --selftest
+python3 scripts/calendars.py fit  skills/earnings-calendars/reference/pltr-2026-08-03.json
+python3 scripts/calendars.py rank skills/earnings-calendars/reference/pltr-2026-08-03.json
+```
+
+That reference file is a real PLTR chain captured the afternoon of its 2026-08-03 print, and
+doubles as a regression fixture. The skill never places orders; it is analysis only.
+
 ## Architecture
 
 The design follows the Honeycomb MCP: a few curated tools, responses shaped for a model rather
