@@ -1,0 +1,18 @@
+{
+  "name": "persona",
+  "version": "0.1.0",
+  "description": "Learn your writing voice from your own Claude Code transcripts via a local labeling UI, then build a skill that translates Claude's output into it.",
+  "author": {
+    "name": "Walker Hughes"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/walkerhughes/claude/tree/main/plugins/persona",
+  "repository": "https://github.com/walkerhughes/claude",
+  "keywords": [
+    "persona",
+    "style",
+    "voice",
+    "preference-learning",
+    "labeling"
+  ]
+}
