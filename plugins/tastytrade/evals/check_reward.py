@@ -5,9 +5,15 @@
 result itself. Every tastytrade task reports one reward in [0, 1], so the mean
 over a task is its pass rate across attempts.
 
-    python3 check_reward.py <result.json> <name>                # every reward 1.0
-    python3 check_reward.py <result.json> <name> --min-mean 0.9 # allow some slack
+    python3 check_reward.py <result.json> <name>                 # every reward 1.0
+    python3 check_reward.py <result.json> <name> --min-mean 0.9  # allow some slack
+    python3 check_reward.py <result.json> <name> --only outcome  # one reward only
     python3 check_reward.py --selftest
+
+Each task reports two rewards, ``outcome`` and ``process`` (see evals/README.md).
+``--only`` restricts the gate to one of them, which is how the local validator
+holds the oracle to ``outcome``: the oracle is a shell script, not an agent, so
+it cannot call MCP tools and cannot score on ``process``.
 
 ``--min-mean`` exists because this gate drives a real agent over 13 tasks, not
 3. A single flaky task should not be indistinguishable from a broken server,
@@ -20,23 +26,29 @@ import sys
 from pathlib import Path
 
 
-def rewards(stats: dict) -> tuple[list | None, str]:
-    """Every reward in the run, or (None, reason) if it did not complete cleanly."""
+def rewards(stats: dict, only: str | None = None) -> tuple[list | None, str]:
+    """Every reward in the run, or (None, reason) if it did not complete cleanly.
+
+    A task with one reward reports it under the metric name ({"mean": 1.0}); a
+    task with several reports them under the reward names ({"outcome": 1.0,
+    "process": 1.0}). `only` filters to one of those names.
+    """
     if stats.get("n_errored_trials") or not stats.get("n_completed_trials"):
         return None, f"run did not complete cleanly (stats={stats})"
     found = [
         value
         for eval_stats in stats.get("evals", {}).values()
         for metric in eval_stats.get("metrics", [])
-        for value in metric.values()
+        for name, value in metric.items()
+        if only is None or name == only
     ]
     if not found:
-        return None, "no rewards reported"
+        return None, f"no {only or ''} rewards reported".replace("  ", " ")
     return found, ""
 
 
-def gate(stats: dict, min_mean: float = 1.0) -> tuple[bool, str]:
-    found, reason = rewards(stats)
+def gate(stats: dict, min_mean: float = 1.0, only: str | None = None) -> tuple[bool, str]:
+    found, reason = rewards(stats, only)
     if found is None:
         return False, reason
     mean = sum(found) / len(found)
@@ -64,6 +76,17 @@ def _selftest() -> None:
     assert not gate(mixed)[0], "one zero must fail a perfect gate"
     assert not gate(mixed, min_mean=0.9)[0], "mean 0.5 is below 0.9"
     assert gate(mixed, min_mean=0.5)[0], "mean 0.5 meets a 0.5 threshold"
+
+    # Two named rewards per task. The oracle solves the answer but cannot call
+    # MCP tools, so it is outcome=1, process=0 and only `--only outcome` passes.
+    split = {
+        "n_completed_trials": 1,
+        "evals": {"a": {"metrics": [{"outcome": 1.0, "process": 0.0}]}},
+    }
+    assert not gate(split)[0], "a zero process reward must fail the full gate"
+    assert gate(split, only="outcome")[0]
+    assert not gate(split, only="process")[0]
+    assert rewards(split, only="nope")[0] is None, "unknown reward name -> None"
     print("check_reward selftest ok")
 
 
@@ -80,7 +103,8 @@ def main(argv: list[str]) -> int:
     except FileNotFoundError:
         print(f"{name}: no result.json at {result_path}", file=sys.stderr)
         return 1
-    ok, msg = gate(stats, min_mean)
+    only = argv[argv.index("--only") + 1] if "--only" in argv else None
+    ok, msg = gate(stats, min_mean, only)
     print(f"{name}: {msg}", file=sys.stdout if ok else sys.stderr)
     return 0 if ok else 1
 

@@ -34,6 +34,13 @@ RUN cd /opt/tastytrade && (uv sync --frozen || uv sync)
 RUN mkdir -p /root/.claude/skills \
     && cp -r /opt/tastytrade/skills/earnings-calendars /root/.claude/skills/earnings-calendars
 
+# rewardkit scores the verifiers (each tests/<name>/ becomes a named reward).
+# Baked in rather than fetched at verify time so verification needs no network,
+# and in its own venv so it cannot disturb the server's resolved dependencies.
+RUN python -m venv /opt/rewardkit \
+    && /opt/rewardkit/bin/pip install --no-cache-dir "harbor-rewardkit==0.1.*" \
+    && ln -s /opt/rewardkit/bin/rewardkit /usr/local/bin/rewardkit
+
 COPY evals/environment/scripts/ /usr/local/bin/
 RUN chmod +x /usr/local/bin/require-local-api /usr/local/bin/start-mock /usr/local/bin/mcp-server
 

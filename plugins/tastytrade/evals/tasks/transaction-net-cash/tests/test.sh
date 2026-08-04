@@ -1,21 +1,11 @@
 #!/usr/bin/env bash
-set -euo pipefail
-APP_DIR="${APP_DIR:-/app}"
-LOG_DIR="${LOG_DIR:-/logs/verifier}"
-mkdir -p "$LOG_DIR"
-reward=0
-if python3 - "$APP_DIR/answer.json" <<'PY'
-import json, sys
-
-try:
-    with open(sys.argv[1]) as fh:
-        data = json.load(fh)
-    value = float(data['net_cash_effect'])
-    sys.exit(0 if abs(value - 524.0) <= 0.01 else 1)
-except Exception as exc:
-    print(f"verifier error: {exc}", file=sys.stderr)
-    sys.exit(1)
-PY
-then reward=1; fi
-echo "$reward" > "$LOG_DIR/reward.txt"
-echo "reward=$reward"
+# Verifier. Two rewards, both computed by rewardkit:
+#
+#   outcome  the answer is right
+#   process  the answer came through the MCP server (or, for the skill task, the skill)
+#
+# `outcome` alone cannot gate this plugin. The mock brokerage is reachable over
+# plain HTTP from inside the container and its source is on disk, so an agent
+# that ignores the MCP entirely can still produce the right answer. A real run
+# did exactly that. `process` is what makes these MCP evals.
+rewardkit /tests
