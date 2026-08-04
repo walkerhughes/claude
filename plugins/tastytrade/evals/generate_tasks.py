@@ -186,7 +186,8 @@ ENVIRONMENT_DOCKERFILE = "FROM tastytrade-bench\n"
 # with `ToolSearch {"query": "tastytrade"}` and then never called a tool:
 #
 #   - one ran `Bash: mcp__tastytrade__get_option_chain --symbol SPY ...`, as a command;
-#   - two handed the call to a subagent, which is invisible to the trajectory;
+#   - two handed the call to a subagent (the check now reads those transcripts too, so
+#     that is no longer scored against them, but it still spends an agent loop);
 #   - `preview-vertical-spread` spent 44 calls writing shell and Python that tried to
 #     reach the MCP over a socket, a subprocess, and an SDK import, then hit the agent
 #     timeout. It had already loaded the schema with `select:mcp__tastytrade__preview_order`
@@ -212,9 +213,8 @@ They are tools, not programs. No command, no HTTP endpoint, and no Python import
 them: `Bash`, `curl`, and `python3` cannot invoke an MCP tool, and a run that spends its
 budget trying will simply time out. Call the tool.
 
-Call it yourself rather than handing the work to a subagent. A subagent's tool calls are
-not part of this run's record, so an answer fetched that way cannot be told apart from a
-guess.
+Call it yourself rather than handing the work to a subagent. Delegating a one-line lookup
+costs a whole extra agent loop and buys nothing.
 
 The work has to go through the tools. Do not call the brokerage's HTTP API directly, do
 not read or edit its source or its fixtures, and do not import the server's Python
@@ -311,21 +311,71 @@ import json
 from rewardkit import criterion
 
 TRAJECTORY = "/logs/agent/trajectory.json"
+SESSIONS = Path("/logs/agent/sessions")
 
 
-def _calls() -> list:
-    """Every tool call in the trajectory, or [] when there is none.
+def _trajectory_calls() -> list:
+    """Tool calls harbor recorded, as steps[].tool_calls[].
 
-    A list rather than a generator so every criterion can fail closed on an
-    empty trajectory. A "did not bypass" check is vacuously true when there are
-    no calls at all, which handed a no-op run half of `process`; no trajectory
-    means no evidence the intended route was taken, so it has to score 0.
+    `path` matters: rewardkit's own trajectory helpers default to
+    /logs/trajectory.json while Harbor agents write /logs/agent/trajectory.json,
+    and a missing file scores 0 silently rather than erroring.
     """
     try:
         data = json.loads(Path(TRAJECTORY).read_text())
     except (OSError, json.JSONDecodeError):
         return []
     return [call for step in data.get("steps") or [] for call in step.get("tool_calls") or []]
+
+
+def _session_calls() -> list:
+    """Tool calls from Claude Code's own transcripts, subagents included.
+
+    harbor builds trajectory.json from the main session only: its session-dir
+    scan drops any jsonl whose path contains a `subagents/` component, and
+    modern Claude Code writes each subagent's transcript there. A call the agent
+    delegated therefore leaves an `Agent` entry in the trajectory and no tool,
+    and two trials fetched the right answer exactly that way.
+
+    Reading the raw transcripts, which sit beside the trajectory under
+    CLAUDE_CONFIG_DIR, makes the check stop caring who placed the call. That
+    cuts both ways on purpose: crediting a delegated MCP call without also
+    seeing a delegated `curl` would turn "ask a subagent" into an invisible
+    bypass, which is the hole this reward exists to close.
+    """
+    calls = []
+    for path in sorted(SESSIONS.rglob("*.jsonl")):
+        try:
+            lines = path.read_text().splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            content = (event.get("message") or {}).get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    calls.append({"function_name": block.get("name"), "arguments": block.get("input")})
+    return calls
+
+
+def _calls() -> list:
+    """Every tool call this trial can be shown to have made, or [].
+
+    The union of both records. Duplicates do not matter: one criterion asks
+    whether any call was an MCP call and the other whether every call stayed
+    off the brokerage, and neither counts.
+
+    A list rather than a generator so every criterion can fail closed on an
+    empty trajectory. A "did not bypass" check is vacuously true when there are
+    no calls at all, which handed a no-op run half of `process`; no record means
+    no evidence the intended route was taken, so it has to score 0.
+    """
+    return _trajectory_calls() + _session_calls()
 
 
 def _name(call) -> str:
@@ -369,17 +419,12 @@ BYPASS = re.compile(r":8080\\b|\\bmock_api\\b", re.IGNORECASE)
 
 @criterion(description="Agent called a tastytrade MCP tool")
 def used_mcp_server(workspace: Path) -> bool:
-    """A tastytrade tool call in *this* trajectory.
+    """Anywhere in the run, subagents included -- see `_session_calls`.
 
-    Which means a call delegated to a subagent does not count: the subagent
-    keeps its own transcript and only its result comes back, so the trajectory
-    shows an `Agent` call and no tool. Two trials reached the right answer that
-    way and scored 0.5 here.
-
-    That is the correct verdict on the evidence rather than a gap to paper
-    over. `process` is a claim about what this run can be shown to have done,
-    and "a delegate says it called the server" is not that. The instruction
-    tells the agent to make the call itself.
+    Whether the top-level agent placed the call or handed it to a delegate is
+    the harness's routing decision, not a fact about this plugin. The question
+    the gate asks is whether a real agent can drive the server to the answer,
+    and a delegated call is that.
     """
     return any(_name(call).startswith(MCP_PREFIX) for call in _calls())
 

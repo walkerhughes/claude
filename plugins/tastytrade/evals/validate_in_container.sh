@@ -3,20 +3,29 @@
 # real rewardkit verifier against three synthetic trajectories and asserts the
 # reward matrix.
 #
-#   case          answer      trajectory                    outcome  process
-#   ------------  ----------  ----------------------------  -------  -------
-#   solved        oracle      took the intended route             1        1
-#   empty         none        none                                0        0
-#   bypassed      oracle      went round the server               1        0
-#   bypassed-alt  oracle      went round it another way           1        0
+#   case               answer   trajectory                      outcome  process
+#   -----------------  -------  ------------------------------  -------  -------
+#   solved             oracle   took the intended route               1        1
+#   empty              none     none                                  0        0
+#   bypassed           oracle   went round the server                 1        0
+#   bypassed-alt       oracle   went round it another way             1        0
+#   delegated          oracle   subagent took the intended route      1        1
+#   delegated-bypass   oracle   subagent went round the server        1        0
 #
-# The last two rows are the point. Before the split, "bypassed" scored a clean
-# 1.0 and a real gate run did exactly that: right answer, server never touched.
+# The bypass rows are the point. Before the split, "bypassed" scored a clean 1.0
+# and a real gate run did exactly that: right answer, server never touched.
 #
 # "bypassed-alt" exists because one spelling of a bypass proves only that one
 # spelling is caught. The mock binds every interface, so it answers on more
 # addresses than a host-matching check can enumerate, and hand arithmetic on the
 # chain leaves no distinctive string at all.
+#
+# The "delegated" pair covers the blind spot behind it. harbor's trajectory
+# holds the main session only, so a call the agent hands to a subagent shows up
+# as an `Agent` entry and no tool; the checks read the raw session transcripts
+# to see through that. Both halves have to be asserted together -- crediting a
+# delegated MCP call while missing a delegated `curl` would make "ask a
+# subagent" an invisible bypass, which is worse than not looking at all.
 #
 # Expects the repo at /work. Nothing here calls a model or the network.
 set -uo pipefail
@@ -40,9 +49,26 @@ skill_bypass='{"steps":[{"tool_calls":[{"function_name":"Read","arguments":{"fil
 # the split existed.
 skill_bypass_alt='{"steps":[{"tool_calls":[{"function_name":"Bash","arguments":{"command":"python3 -c \"print((2.34 + 2.62) / 125.64 * 100)\""}}]}]}'
 
-# Score one task against one trajectory. Echoes "<outcome> <process>".
+# What the top-level agent's trajectory looks like when it delegates: an Agent
+# call and nothing else. Paired with a subagent transcript below, this is the
+# shape two real trials had.
+delegating='{"steps":[{"tool_calls":[{"function_name":"Agent","arguments":{"description":"Look up the answer"}}]}]}'
+# Subagent transcripts are Claude Code session lines, not harbor trajectories:
+# type/message.content[] with tool_use blocks carrying `name` and `input`.
+sub_mcp='{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"t1","name":"mcp__tastytrade__get_portfolio","input":{}}]}}'
+sub_bypass='{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"curl -s http://localhost:8080/customers/me/accounts"}}]}}'
+sub_skill='{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"python3 /opt/tastytrade/scripts/calendars.py fit chain.json"}}]}}'
+
+# Score one task against one trajectory, optionally with a subagent transcript.
+# Echoes "<outcome> <process>".
+#
+# $4 is a Claude Code session line placed where a real subagent's would land, at
+# sessions/projects/<proj>/<session>/subagents/. That path is the whole point:
+# harbor's session scan skips anything under `subagents/`, so a call written
+# there is absent from trajectory.json by construction, exactly as it is in a
+# real delegated run.
 score() {
-    local task=$1 trajectory=$2 solved=$3
+    local task=$1 trajectory=$2 solved=$3 subagent=${4:-}
     local work
     work="$(mktemp -d)"
     mkdir -p "$work/app" "$work/logs/agent" "$work/logs/verifier"
@@ -53,6 +79,11 @@ score() {
     fi
     if [ -n "$trajectory" ]; then
         printf '%s' "$trajectory" > "$work/logs/agent/trajectory.json"
+    fi
+    if [ -n "$subagent" ]; then
+        local subdir="$work/logs/agent/sessions/projects/app/sess/subagents"
+        mkdir -p "$subdir"
+        printf '%s\n' "$subagent" > "$subdir/sub.jsonl"
     fi
 
     # rewardkit reads the trajectory from an absolute path baked into the check,
@@ -91,16 +122,22 @@ for dir in "$TASKS"/*/; do
         good=$skill_good
         bypass=$skill_bypass
         bypass_alt=$skill_bypass_alt
+        sub_good=$sub_skill
     else
         good=$mcp_good
         bypass=$mcp_bypass
         bypass_alt=$mcp_bypass_alt
+        sub_good=$sub_mcp
     fi
 
     expect "$task" solved       "$(score "$task" "$good" yes)"       "1.0 1.0"
     expect "$task" empty        "$(score "$task" '' no)"             "0.0 0.0"
     expect "$task" bypassed     "$(score "$task" "$bypass" yes)"     "1.0 0.0"
     expect "$task" bypassed-alt "$(score "$task" "$bypass_alt" yes)" "1.0 0.0"
+    expect "$task" delegated \
+        "$(score "$task" "$delegating" yes "$sub_good")" "1.0 1.0"
+    expect "$task" delegated-bypass \
+        "$(score "$task" "$delegating" yes "$sub_bypass")" "1.0 0.0"
 done
 
 echo

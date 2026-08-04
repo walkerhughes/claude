@@ -123,11 +123,18 @@ For `earnings-implied-move` `process` asks that the skill or its script was used
 agent that eyeballs the straddle can land close enough to pass `outcome` without loading
 the skill, and an early run did.
 
-A delegated call does not count. A subagent keeps its own transcript and returns only its
-result, so the trajectory shows an `Agent` call and no tool; two trials fetched the right
-answer that way and scored 0.5. That is the correct verdict on the evidence rather than a
-gap to paper over -- "a delegate says it called the server" is not a record of this run
-calling it -- so the instruction tells the agent to make the call itself.
+A delegated call counts, and seeing it takes a second source. `trajectory.json` holds the
+main session only: harbor's session scan drops any jsonl whose path contains a `subagents/`
+component, which is exactly where Claude Code writes a subagent's transcript. So a call the
+agent hands to a delegate leaves an `Agent` entry and no tool, and two trials fetched the
+right answer that way. The checks therefore read the raw session transcripts under
+`/logs/agent/sessions` as well, and stop caring who placed the call: whether the top-level
+agent called the tool or routed it through a delegate is the harness's decision, not a fact
+about this plugin, and the gate's question is whether a real agent can drive the server.
+
+That has to cut both ways. Crediting a delegated MCP call while missing a delegated `curl`
+would turn "ask a subagent" into an invisible bypass, so the bypass criterion reads the same
+union, and `validate_local.sh` asserts both directions.
 
 Every task prompt states the rule `process` scores, and each paragraph of it is there
 because a gate run failed without it. The first run under the split scored `outcome` 1.0
@@ -197,7 +204,7 @@ meant downloading the CI artifact, which expires after seven days.
 
 ## Check the verifiers without Harbor
 
-`validate_local.sh` scores every task's real verifier against four synthetic trajectories
+`validate_local.sh` scores every task's real verifier against six synthetic trajectories
 and asserts the whole reward matrix. No model, no Harbor, no API key:
 
 | case | answer | trajectory | outcome | process |
@@ -206,15 +213,21 @@ and asserts the whole reward matrix. No model, no Harbor, no API key:
 | empty | none | none | 0 | 0 |
 | bypassed | oracle | went round the server | 1 | 0 |
 | bypassed-alt | oracle | went round it another way | 1 | 0 |
+| delegated | oracle | subagent took the intended route | 1 | 1 |
+| delegated-bypass | oracle | subagent went round the server | 1 | 0 |
 
-The last two rows are the point, and they are what `harbor run -a oracle` cannot tell you.
+The bypass rows are the point, and they are what `harbor run -a oracle` cannot tell you.
 `bypassed-alt` exists because one spelling of a bypass proves only that one spelling is
 caught: it reaches the mock on an address the first check's hostname list did not name, and
 for the skill task it does the arithmetic inline, which leaves no distinctive string at all.
 
+The `delegated` pair covers the blind spot behind it, and both halves have to be asserted
+together: crediting a delegated MCP call while missing a delegated `curl` would make "ask a
+subagent" an invisible bypass, which is worse than not looking at all.
+
 ```bash
 make validate-tasks
-# 52 passed, 0 failed
+# 78 passed, 0 failed
 ```
 
 It runs in the bench image rather than on the host, because rewardkit scores these checks

@@ -19,9 +19,8 @@ They are tools, not programs. No command, no HTTP endpoint, and no Python import
 them: `Bash`, `curl`, and `python3` cannot invoke an MCP tool, and a run that spends its
 budget trying will simply time out. Call the tool.
 
-Call it yourself rather than handing the work to a subagent. A subagent's tool calls are
-not part of this run's record, so an answer fetched that way cannot be told apart from a
-guess.
+Call it yourself rather than handing the work to a subagent. Delegating a one-line lookup
+costs a whole extra agent loop and buys nothing.
 
 The work has to go through the tools. Do not call the brokerage's HTTP API directly, do
 not read or edit its source or its fixtures, and do not import the server's Python
