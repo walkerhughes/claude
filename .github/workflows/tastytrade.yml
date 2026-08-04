@@ -125,9 +125,11 @@ jobs:
       - name: Run the eval gate (claude-code)
         env:
           EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
-          # Push to main only. PR runs would mint a hub job per push with nothing
-          # to clean them up; main's runs are the ones worth a trend.
-          EVALS_UPLOAD: ${{ github.event_name == 'push' && '1' || '' }}
+          # Every gate run uploads, PR included. Gating this to pushes on main
+          # meant a PR gate left nothing on the hub, so the only record of a run
+          # was a CI artifact that expires in 7 days. One job per run is cheap;
+          # a result you cannot find later is not.
+          EVALS_UPLOAD: "1"
         run: make evals
 
       # always(), not failure(): harbor draws progress as a live TUI, so a run

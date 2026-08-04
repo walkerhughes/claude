@@ -107,10 +107,12 @@ present the CLI prefers it over the token, which either moves the run onto credi
 if the key is empty, 401s every trial before spending a token. `job.yaml` used to declare the
 key for exactly this reason and no longer does.
 
-On pushes to main the run uploads to the Harbor hub as **`ci-evals-tastytrade`**. That follows
-the repo-wide `ci-evals-<plugin>` convention, so every plugin's CI history is searchable
-together instead of hiding behind a generic job name. PR runs do not upload: a hub job per push
-would pile up with nothing to clean them up, so the uploaded trend covers the branch that ships.
+Every gate run uploads to the Harbor hub as **`ci-evals-tastytrade`**, one job per CI run
+holding all 13 tasks as trials. That follows the repo-wide `ci-evals-<plugin>` convention, so
+every plugin's CI history is searchable together instead of hiding behind a generic job name.
+
+PR runs upload too. Restricting uploads to main left a PR gate with nothing on the hub, so the
+only record was a CI artifact that expires after 7 days.
 
 ```bash
 export CLAUDE_CODE_OAUTH_TOKEN=...   # claude setup-token
