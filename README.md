@@ -15,6 +15,16 @@ Formerly `walkerhughes/mcps`, back when it only held MCP servers.
 
 They follow Honeycomb's [MCP, easy as 1-2-3](https://www.honeycomb.io/blog/mcp-easy-as-1-2-3) guidance: a few curated tools built around real questions rather than raw API endpoints, responses shaped for a model instead of a UI, and typed schemas that steer the model toward valid calls.
 
+## Skills
+
+Plugins that ship [skills](https://code.claude.com/docs/en/skills) instead of a server. Nothing to connect and no credentials to hold.
+
+| Plugin | Skills | What it does |
+|--------|--------|--------------|
+| [`persona`](plugins/persona/) | `humanoid`, `me` | Write in your own voice. `humanoid` is plain-language guidance that applies the moment it is installed. `me` runs a local labeling loop that learns your voice from your own writing and generates a third skill, `persona-voice`, specific to you. |
+
+The loop behind `me` is generator/discriminator: Claude drafts a voice skill from writing you label, isolated subagents use only that skill to produce candidate passages, and you judge them blind against your real writing. It stops once Claude passes as you three times. Everything runs on `127.0.0.1` against files already on disk, so no writing is uploaded and the subagents never see the corpus.
+
 ## Install a plugin
 
 Run these as two separate commands, not as one paste: the first opens a prompt that expects only the `owner/repo`.
@@ -33,7 +43,7 @@ The non-interactive equivalents are more reliable, and are the only way to move 
 claude plugin marketplace update walkerhughes && claude plugin update harbor-hub@walkerhughes
 ```
 
-Plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. A plugin update needs a Claude Code restart, not just an `/mcp` reconnect. See each server's README for credentials.
+MCP server plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. A plugin update needs a Claude Code restart, not just an `/mcp` reconnect. See each server's README for credentials. Skill-only plugins have no such setup: `persona` needs nothing beyond the `python3` already on your system.
 
 ### Shipping a plugin change
 
@@ -46,9 +56,10 @@ claude/
 ├── .claude-plugin/          # marketplace manifest
 └── plugins/
     ├── harbor-hub/
+    ├── persona/
     └── tastytrade/
 ```
 
-Plugins live under `plugins/`, one directory each, named for the platform they talk to rather than for being an MCP server. Skills and other components get their own top-level directories as they arrive.
+Plugins live under `plugins/`, one directory each, named for the platform they talk to or the thing they do rather than for being an MCP server. A plugin is the unit Claude Code installs, so skills ship inside one too rather than as a loose directory.
 
 Each plugin directory is self-contained: its own `README.md` covers install, credentials, tests, and tools. CI runs per subdirectory via `paths` filters, so a change to one never runs another's suite.
