@@ -1,0 +1,15 @@
+# The benchmark image copies this directory, so keep out anything large, local, or
+# secret. .env especially: the image ships throwaway credentials on purpose and must
+# never pick up real ones.
+.env
+.venv
+.git
+.githooks
+evals/jobs
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov

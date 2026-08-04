@@ -1,6 +1,6 @@
 {
   "name": "tastytrade",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP server for the TastyTrade Open API: brokerage accounts, positions, market data, option chains, transactions, and order preview.",
   "author": {
     "name": "Walker Hughes"

@@ -8,6 +8,7 @@ away from the data the agent actually sees. Change a fixture in
 Run: python evals/generate_tasks.py
 """
 
+import importlib.util
 import json
 import os
 import stat
@@ -53,6 +54,27 @@ def _latest_dividend():
 def _watchlist_symbols():
     entries = fx.WATCHLIST_DETAIL["My Tech"]["data"]["watchlist-entries"]
     return [e["symbol"] for e in entries]
+
+
+# The reference chain the earnings-calendars skill ships. Loading the skill's own module
+# keeps the same invariant as the fixture tasks: the expected answer is computed by the
+# code under test, so it cannot drift away from what the agent will see.
+SKILL_CHAIN = os.path.join(ROOT, "skills", "earnings-calendars", "reference", "pltr-2026-08-03.json")
+
+
+def _calendars_module():
+    spec = importlib.util.spec_from_file_location("calendars", os.path.join(ROOT, "scripts", "calendars.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _implied_move_pct():
+    calendars = _calendars_module()
+    with open(SKILL_CHAIN) as fh:
+        chain = calendars.Chain(json.load(fh))
+    _, _, jump = calendars.fit_term_structure(chain)
+    return round(calendars.expected_abs_move(jump) * 100, 2)
 
 
 # Each numeric task: directory name, prompt, the JSON key the agent must write, the value
@@ -199,6 +221,26 @@ set -euo pipefail
 APP_DIR="${{APP_DIR:-/app}}"
 mkdir -p "$APP_DIR"
 echo '{{"{key}": {expected}}}' > "$APP_DIR/answer.json"
+"""
+
+# The skill task deliberately does not name the script or the skill. The point is whether
+# the agent recognises an earnings-vol question and reaches for the right tool on its own,
+# so naming it would test only that the agent can copy a command out of a prompt.
+SKILL_INSTRUCTION = """\
+# Task: {title}
+
+PLTR reports earnings after the close today. A snapshot of its option chain, taken that
+afternoon, is saved at:
+
+    {chain}
+
+{instruction}
+
+Write it to `/app/answer.json` as a single JSON object with this shape, and nothing else:
+
+```json
+{{"{key}": <number>}}
+```
 """
 
 CSV_INSTRUCTION = """\
@@ -363,6 +405,38 @@ def generate() -> list[str]:
     _write(
         os.path.join(base, "solution", "solve.sh"),
         CSV_SOLVE.format(json_line=json.dumps({"symbols": _watchlist_symbols()})),
+        executable=True,
+    )
+    names.append(name)
+
+    # Earnings-calendar skill: the one task that exercises a skill rather than the MCP
+    # tools. The chain is a file in the image, so the answer is fixed and no market data
+    # is involved.
+    name = "earnings-implied-move"
+    base = os.path.join(TASKS_DIR, name)
+    key = "implied_expected_move_pct"
+    expected = _implied_move_pct()
+    instruction = (
+        "From that chain, find the implied expected absolute move for the earnings event, "
+        "as a percent of the spot price."
+    )
+    chain_in_image = "/opt/tastytrade/skills/earnings-calendars/reference/pltr-2026-08-03.json"
+    _write(
+        os.path.join(base, "task.toml"),
+        TASK_TOML.format(name=name, desc="Find PLTR's implied expected earnings move from a saved option chain."),
+    )
+    _write(
+        os.path.join(base, "instruction.md"),
+        SKILL_INSTRUCTION.format(title=_title(name), instruction=instruction, key=key, chain=chain_in_image),
+    )
+    _write(
+        os.path.join(base, "tests", "test.sh"),
+        NUMERIC_TEST.format(key=key, expected=expected, tol=0.5),
+        executable=True,
+    )
+    _write(
+        os.path.join(base, "solution", "solve.sh"),
+        NUMERIC_SOLVE.format(key=key, expected=expected),
         executable=True,
     )
     names.append(name)

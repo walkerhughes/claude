@@ -49,8 +49,9 @@ mock-api:
 # validated against. Override with e.g. HARBOR=harbor to use a different harbor.
 HARBOR ?= uv tool run --from "harbor==0.13.2" harbor
 
+# Context is the plugin root so the image can copy the working tree it is testing.
 benchmark-build:
-	docker build -t tastytrade-bench evals/environment
+	docker build -f evals/environment/Dockerfile -t tastytrade-bench .
 
 benchmark:
 	cd evals && $(HARBOR) run -c job.yaml
