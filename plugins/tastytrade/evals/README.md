@@ -76,8 +76,8 @@ tasks were validated against, so it doesn't depend on what's on your PATH:
 ```bash
 docker build -f evals/environment/Dockerfile -t tastytrade-bench .
 cd evals
-uv tool run --from "harbor==0.13.2" harbor run -c job.yaml
-uv tool run --from "harbor==0.13.2" harbor view jobs
+uv tool run --from "harbor==0.18.0" harbor run -c job.yaml
+uv tool run --from "harbor==0.18.0" harbor view jobs
 ```
 
 Each task carries a one-line `environment/Dockerfile` (`FROM tastytrade-bench`). Harbor only

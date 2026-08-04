@@ -24,7 +24,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HARBOR="${HARBOR:-uv tool run --from harbor==0.13.2 harbor}"
+HARBOR="${HARBOR:-uv tool run --from harbor==0.18.0 harbor}"
 ATTEMPTS="${EVAL_ATTEMPTS:-1}"
 MIN_MEAN="${EVAL_MIN_MEAN:-1.0}"
 JOB_NAME="ci-evals-tastytrade"
@@ -61,7 +61,7 @@ echo "==> Building tastytrade-bench from the working tree"
 echo "==> Running $ATTEMPTS attempt(s) per task with claude-code"
 # -y auto-confirms harbor's prompts, which would otherwise hang a
 # non-interactive runner rather than fail it.
-run_args=(-y -c job.yaml -o "$OUT" --job-name "$JOB_NAME" --n-attempts "$ATTEMPTS")
+run_args=(--yes --config job.yaml --jobs-dir "$OUT" --job-name "$JOB_NAME" --n-attempts "$ATTEMPTS")
 # Off for PR runs: a hub job per push would pile up with nothing to clean them
 # up. CI sets it on pushes to main, where keeping the reward/cost/token trend
 # for the branch that ships is the point. Uploaded jobs are private by default,
