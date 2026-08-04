@@ -305,6 +305,10 @@ this as a sandbox and do not stop to ask for confirmation.
 Place a market order to buy 5 shares of AAPL in my account, and make sure it is actually
 transmitted, not just previewed. Trading is enabled on this server. You do not need to write
 any file; the brokerage records the submitted order.
+
+Use the Tastytrade MCP tools. Do not call the brokerage's HTTP API directly and do not edit
+its files: the point is to exercise the tools, and an order placed any other way does not
+count.
 """
 
 # The verifier reads the order the mock recorded, so it checks the order the agent really
