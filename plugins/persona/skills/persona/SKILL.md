@@ -13,15 +13,25 @@ user attributes **3 or more** subagent passages to themselves.
 `SCRIPT` below means `${CLAUDE_PLUGIN_ROOT}/scripts/persona.py`. State lives in
 `~/.claude/persona/state.json`; the output skill is `~/.claude/skills/persona-voice/SKILL.md`.
 
+Run `python3 SCRIPT status` first, at any point. It prints where the loop is and
+what to do next, so a returning user resumes rather than restarts.
+
 ## 1. Harvest
 
 ```bash
-python3 SCRIPT harvest --limit 60
+python3 SCRIPT harvest --limit 60 [--from ~/notes --from ~/drafts]
 ```
 
 Mines the user's own prose from `~/.claude/projects/**/*.jsonl`, skipping
 subagent sidechains (those user turns were written by a model, not the user).
-Say how many it found. Under ~20, raise `--limit` or note the corpus is thin.
+
+**Ask for `--from` paths.** Transcripts contain exactly one register: the user
+instructing an agent. A skill built on them alone is guessing at every other
+kind of writing, which is what the first validated run demonstrated. Notes,
+drafts, posts, anything they wrote as themselves is worth more than another
+twenty transcript snippets.
+
+Say how many it found. Under ~20, raise `--limit` or say the corpus is thin.
 
 ## 2. Critique round
 
@@ -29,8 +39,15 @@ Say how many it found. Under ~20, raise `--limit` or note the corpus is thin.
 python3 SCRIPT serve --mode critique
 ```
 
-Opens a browser. The user marks each snippet as characteristic or not and says
-what is off. Wait for them to tell you they're done, then:
+Opens a browser and stops on its own once the queue is labeled, so run it in the
+background and wait for the user rather than polling. Three verdicts: sounds
+like me, not like me, nothing to judge.
+
+**Push for negatives.** Tell the user before they start that one "not like me"
+with a note is worth several positives. Without any, every rule you write is
+induced from what they approved plus mechanical counts, never from contrast.
+
+When they say they're done:
 
 ```bash
 python3 SCRIPT report
@@ -68,8 +85,15 @@ Ask for the rewritten passage only, no commentary. Then:
 echo '["text one", "text two", ...]' | python3 SCRIPT candidates --round N
 ```
 
-Generate 4-6 per round. Vary the passage type: an explanation, a refusal, a
-status update, a bit of praise, a disagreement.
+Generate 4-6 per round. **Draw the passages from the registers the corpus
+actually covers.** The first validated run scored 0 of 5 on explanations,
+praise and status updates, then 4 of 5 on asks, bug reports, questions and
+proposals: the same skill, tested where the evidence was. If the user only fed
+in transcripts, stay with asks and reports, and say plainly that other registers
+are untested rather than quietly avoiding them.
+
+Frame structural guidance as ordering, never as labels. A round-1 candidate
+opened with the literal words "why it matters" and was spotted instantly.
 
 ## 5. Blind round
 

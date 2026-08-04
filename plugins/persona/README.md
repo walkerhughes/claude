@@ -10,17 +10,50 @@ times, the skill is done.
 
 ## Use
 
-Say "learn my voice" (or `/persona`) and Claude drives it. Underneath:
-
-```bash
-python3 scripts/persona.py harvest --limit 60   # mine your prose from transcripts
-python3 scripts/persona.py serve --mode critique # label what sounds like you
-python3 scripts/persona.py serve --mode turing   # blind: you, or a subagent?
-python3 scripts/persona.py report                # labels + fool count
+```
+/persona
 ```
 
-Output lands in `~/.claude/skills/persona-voice/SKILL.md`. Labels live in
+That's it. Claude drives the whole loop and tells you what to do at each step.
+Saying "learn my voice" or "make this sound like me" triggers the same skill.
+
+Point it at writing outside your transcripts, which is worth doing:
+
+```
+/persona ~/notes ~/drafts
+```
+
+Expect to spend about ten minutes labeling. You can stop partway and resume:
+`/persona` picks up where you left off.
+
+Output lands in `~/.claude/skills/persona-voice/SKILL.md`, which Claude then
+uses automatically whenever you ask for text in your voice. Labels live in
 `~/.claude/persona/state.json`.
+
+### Underneath
+
+```bash
+python3 scripts/persona.py status                 # where you are in the loop
+python3 scripts/persona.py harvest --from ~/notes # mine your prose
+python3 scripts/persona.py serve --mode critique  # label what sounds like you
+python3 scripts/persona.py serve --mode turing    # blind: you, or a subagent?
+python3 scripts/persona.py report                 # labels + fool count
+```
+
+The server stops itself once you've labeled the queue. No ctrl-c, no orphan
+process holding the port.
+
+## Getting a good result
+
+Two things matter more than the rest:
+
+- **Label some negatives.** "Not how I would say it", with a note. Everything
+  coming back positive means every rule is induced from what you approved rather
+  than from contrast, and the skill has nothing to push against.
+- **Feed it more than transcripts.** Claude Code transcripts are one register:
+  you instructing an agent. A skill built only on those was caught 5 times out
+  of 5 on praise and status updates, then fooled 4 of 5 on asks and bug reports.
+  Same skill, tested where the evidence was. `--from` is how you widen it.
 
 ## Privacy
 
