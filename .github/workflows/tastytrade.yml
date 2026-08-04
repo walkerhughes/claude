@@ -77,6 +77,10 @@ jobs:
     env:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       CLAUDE_FORCE_OAUTH: "1"
+      # For --upload on pushes to main. Results land on the hub as
+      # `ci-evals-tastytrade`, following the repo-wide `ci-evals-<plugin>`
+      # convention so every plugin's CI history is searchable together.
+      HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
       # One attempt per task. 13 tasks is already the bulk of a gate run, and a
       # task that only passes sometimes is a signal to fix the task, not to
       # average it away.
@@ -121,6 +125,9 @@ jobs:
       - name: Run the eval gate (claude-code)
         env:
           EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
+          # Push to main only. PR runs would mint a hub job per push with nothing
+          # to clean them up; main's runs are the ones worth a trend.
+          EVALS_UPLOAD: ${{ github.event_name == 'push' && '1' || '' }}
         run: make evals
 
       # always(), not failure(): harbor draws progress as a live TUI, so a run

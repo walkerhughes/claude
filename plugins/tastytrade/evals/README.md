@@ -93,6 +93,30 @@ of the job directory.
 The image copies the working tree rather than cloning a ref, so a run measures the code you
 have checked out. Rebuild after changing the server or the skill.
 
+## The merge gate
+
+`make validate-tasks` and `make evals` answer different questions, and CI runs both.
+`validate-tasks` proves each verifier accepts its oracle and rejects an empty answer, with no
+model involved, which catches a broken verifier. `make evals` drives all 13 tasks with the
+real claude-code agent and fails unless every reward is 1.0, which is the only thing that
+catches a server or skill an agent cannot actually drive.
+
+The gate authenticates with `CLAUDE_CODE_OAUTH_TOKEN` so runs bill to a Claude subscription
+rather than API credits. It deliberately does **not** accept `ANTHROPIC_API_KEY`: with a key
+present the CLI prefers it over the token, which either moves the run onto credits silently or,
+if the key is empty, 401s every trial before spending a token. `job.yaml` used to declare the
+key for exactly this reason and no longer does.
+
+On pushes to main the run uploads to the Harbor hub as **`ci-evals-tastytrade`**. That follows
+the repo-wide `ci-evals-<plugin>` convention, so every plugin's CI history is searchable
+together instead of hiding behind a generic job name. PR runs do not upload: a hub job per push
+would pile up with nothing to clean them up, so the uploaded trend covers the branch that ships.
+
+```bash
+export CLAUDE_CODE_OAUTH_TOKEN=...   # claude setup-token
+make evals                           # add HARBOR_API_KEY and EVALS_UPLOAD=1 to upload
+```
+
 ## Check the verifiers without Harbor
 
 `validate_local.sh` runs each task's oracle (`solve.sh`), then its verifier (`test.sh`), and

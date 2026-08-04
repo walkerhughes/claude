@@ -32,6 +32,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARBOR_TEST_ENV="${HARBOR_TEST_ENV:-docker}"
+# Repo-wide convention: ci-evals-<plugin>, so every plugin's CI runs are
+# searchable together on the hub instead of hiding behind a generic name.
+JOB_NAME="ci-evals-harbor-hub"
 EVAL_TASK_REF="${EVAL_TASK_REF:-hello-world/hello-world@1}"
 # Git ref the eval images pip-install harbor-mcp from. The default branch is
 # only right for a run of main: as a PR gate the images must be built from the
@@ -115,7 +118,7 @@ run_args=(
     -a claude-code
     -e "$HARBOR_TEST_ENV"
     -o "$JOBS_DIR"
-    --job-name evals-gate
+    --job-name "$JOB_NAME"
     --ae HARBOR_API_KEY="$HARBOR_API_KEY"
     --ae EVAL_READ_JOB_ID="$READ_JOB_ID"
     --ae EVAL_DELETE_JOB_ID="$DELETE_JOB_ID"
@@ -135,9 +138,9 @@ harbor run "${run_args[@]}"
 
 # harbor run exits 0 regardless of reward; gate on a perfect result so CI
 # (and `make evals`) fails the moment any eval regresses.
-if ! python3 "$REPO_ROOT/evals/check_reward.py" "$JOBS_DIR/evals-gate/result.json" evals-gate; then
+if ! python3 "$REPO_ROOT/evals/check_reward.py" "$JOBS_DIR/$JOB_NAME/result.json" "$JOB_NAME"; then
     echo "--- verifier output ---" >&2
-    cat "$JOBS_DIR/evals-gate"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+    cat "$JOBS_DIR/$JOB_NAME"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
     die "the evals did not all reach reward 1.0"
 fi
 

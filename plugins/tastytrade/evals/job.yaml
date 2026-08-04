@@ -18,8 +18,13 @@ orchestrator:
 
 environment:
   type: docker
-  env:
-    - "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+# No ANTHROPIC_API_KEY here on purpose. The agent authenticates with
+# CLAUDE_CODE_OAUTH_TOKEN, which harbor's claude-code agent forwards when
+# CLAUDE_FORCE_OAUTH is set. Declaring the key put an empty ANTHROPIC_API_KEY in
+# the container, the CLI preferred it over the token (apiKeySource:
+# ANTHROPIC_API_KEY), and every trial died on a 401 before spending a token.
+# Adding it back on a machine that has one also silently moves the run onto API
+# credits.
 
 agents:
   - name: claude-code
