@@ -124,7 +124,8 @@ the `harbor` CLI.
 
 ```bash
 export HARBOR_API_KEY=hk_...
-export ANTHROPIC_API_KEY=sk-ant-...   # or CLAUDE_CODE_OAUTH_TOKEN
+export CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...   # from `claude setup-token`
+export CLAUDE_FORCE_OAUTH=1   # bills a subscription; without it a stray API key wins
 make evals          # the merge gate: drives the evals with claude-code
 ```
 

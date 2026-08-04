@@ -86,9 +86,11 @@ Read-only is the default. Every write tool refuses unless `HARBOR_MCP_ENABLE_WRI
 | Tier | Command | Needs | Uses an LLM? |
 |------|---------|-------|--------------|
 | unit | `make test` | nothing (harbor clients mocked) | no |
-| integration | `make test-integration` | `HARBOR_API_KEY` | no (tools driven directly over MCP stdio) |
+| integration | `make test-integration` | `HARBOR_API_KEY` + `HARBOR_TEST_ORG` | no (tools driven directly over MCP stdio) |
 | e2e | `make test-e2e` | `HARBOR_API_KEY` + `HARBOR_TEST_ENV` | no (oracle agent runs `solve.sh`) |
-| evals | `make evals` | `HARBOR_API_KEY` + `ANTHROPIC_API_KEY` + `EVAL_*` | yes (agent rollouts) |
+| evals | `make evals` | `HARBOR_API_KEY` + `CLAUDE_CODE_OAUTH_TOKEN` + `EVAL_*` | yes (agent rollouts) |
+
+`HARBOR_TEST_ORG` is the org the publish round-trip publishes its scratch task into; it must be one your key's user belongs to (auto-created on first publish), and the private scratch package persists, since the hub has no unpublish for packages.
 
 `HARBOR_TEST_ENV` selects where harbor runs the fixture job: `docker` (default) or `modal`. Modal needs its own credentials (`modal token new`) and the `modal` extra (`uv sync --dev --extra modal`), which pulls in harbor's modal support; the base install omits it. The integration and e2e tiers are deterministic (no agent decisions), so they gate PRs without spending on model calls; the `evals/` agent rollouts run separately once tool use is proven at the lower tiers.
 
