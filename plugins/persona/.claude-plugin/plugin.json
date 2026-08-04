@@ -1,7 +1,7 @@
 {
   "name": "persona",
-  "version": "0.1.0",
-  "description": "Learn your writing voice from your own Claude Code transcripts via a local labeling UI, then build a skill that translates Claude's output into it.",
+  "version": "0.2.0",
+  "description": "Skills for writing in your own voice: a plain-language style skill, plus a local labeling loop that learns your voice from your own transcripts.",
   "author": {
     "name": "Walker Hughes"
   },

@@ -14,7 +14,7 @@
     {
       "name": "persona",
       "source": "./plugins/persona",
-      "description": "Learn your writing voice from your own Claude Code transcripts via a local labeling UI, then build a skill that translates Claude's output into it. Everything stays on your machine."
+      "description": "Write in your own voice. Ships a plain-language style skill, plus a local labeling loop that learns your voice from your own transcripts and builds a translation skill from it. Everything stays on your machine."
     },
     {
       "name": "tastytrade",

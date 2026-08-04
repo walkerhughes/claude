@@ -1,14 +1,27 @@
 # persona
 
-Learns your writing voice from your own Claude Code transcripts and builds a
-skill that translates Claude's output into it.
+Two skills for writing in your own voice.
+
+**`be-human`** is the general one: plain language, answer first, no filler, no
+em dashes. It applies immediately after install, with nothing to set up. Say
+"be human", ask for something in plain English, or tell Claude a response was
+too jargon-heavy.
+
+**`persona`** is the personal one. It learns *your* voice from your own writing
+and builds a translation skill specific to you. That takes about ten minutes of
+labeling, described below.
+
+Use the first if you want better prose today. Use the second if you want prose
+that sounds like you specifically.
+
+## Learning your voice
 
 The loop is generator/discriminator. Claude drafts a voice skill from snippets
 you label, isolated subagents use that skill to write candidate passages, and
 you judge them blind against your own real writing. When Claude fools you three
 times, the skill is done.
 
-## Use
+### Use
 
 ```
 /persona
