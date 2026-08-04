@@ -43,3 +43,93 @@ jobs:
 
       - name: Validate eval task verifiers
         run: make validate-tasks
+
+  evals:
+    # THE MERGE GATE on the tool surface and the earnings-calendars skill: drives
+    # every task with the real claude-code agent against the mock API, and fails
+    # unless the rewards clear the threshold.
+    #
+    # `check` above runs make validate-tasks, which is a different question: it
+    # proves each verifier accepts its oracle and rejects an empty answer, with no
+    # model involved. That catches a broken verifier. Only this catches a server or
+    # skill that a real agent cannot actually drive.
+    #
+    # Unlike every other step here this one spends model tokens, so it needs `check`
+    # to pass first and is guarded to same-repo PRs (a fork PR gets no secrets).
+    #
+    # It spends them against a Claude subscription rather than API credits.
+    # CLAUDE_FORCE_OAUTH makes harbor's claude-code agent blank ANTHROPIC_API_KEY
+    # before building the container env, so only CLAUDE_CODE_OAUTH_TOKEN survives
+    # and the CLI falls back to subscription auth. Never add ANTHROPIC_API_KEY back:
+    # with both present and the flag unset the CLI silently prefers the key and the
+    # run is on credits again, with only a debug log to say so.
+    #
+    # Serialized on purpose. Subscription rate limits are per account and shared
+    # with interactive use. Note this group does not serialize against harbor-hub's
+    # gate, which draws on the same account; if the two start colliding, give both
+    # workflows one shared group name.
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    concurrency:
+      group: tastytrade-evals
+      cancel-in-progress: false
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CLAUDE_FORCE_OAUTH: "1"
+      # One attempt per task. 13 tasks is already the bulk of a gate run, and a
+      # task that only passes sometimes is a signal to fix the task, not to
+      # average it away.
+      EVAL_ATTEMPTS: "1"
+      EVAL_MIN_MEAN: "1.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      # A setup-token credential is long-lived but not permanent. Without this
+      # probe an expired one surfaces as "the gate did not clear 1.0", which reads
+      # as a server regression and isn't. Fails rather than skips on a missing
+      # token: a secret-dependent job silently going green is the worse failure.
+      - name: Check the subscription token
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Mint one with 'claude setup-token' and add it as a repository secret."
+            exit 1
+          fi
+          status="$(curl -sS -o /tmp/auth-probe.json -w '%{http_code}' \
+            https://api.anthropic.com/v1/messages \
+            -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')"
+          if [ "$status" = "401" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is expired or revoked. Mint a new one with 'claude setup-token' and update the repository secret."
+            exit 1
+          fi
+          if [ "$status" != "200" ]; then
+            echo "::error::Auth probe returned HTTP $status, expected 200. The gate would likely fail after spending a rate-limit window; response body:"
+            cat /tmp/auth-probe.json
+            exit 1
+          fi
+          echo "Auth probe returned HTTP 200; proceeding."
+
+      - name: Run the eval gate (claude-code)
+        env:
+          EVALS_OUT_DIR: ${{ runner.temp }}/eval-trials
+        run: make evals
+
+      # always(), not failure(): harbor draws progress as a live TUI, so a run
+      # that passes slowly logs almost nothing. The trials are the only record a
+      # PR run produces, and a failure is only diagnosable from the trajectory.
+      - name: Upload trials for diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tastytrade-eval-trials
+          path: ${{ runner.temp }}/eval-trials
+          retention-days: 7

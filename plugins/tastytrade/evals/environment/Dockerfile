@@ -28,6 +28,9 @@ RUN cd /opt/tastytrade && (uv sync --frozen || uv sync)
 
 # Claude Code discovers personal skills here. Installing the skill lets a task
 # exercise the real trigger path instead of naming the script in its prompt.
+# Every task image is FROM this one, so the agent container gets it too. Harbor
+# also has a --skills flag that mounts a directory; this stays in the image
+# because it can be verified with a plain `docker run`, and that flag cannot.
 RUN mkdir -p /root/.claude/skills \
     && cp -r /opt/tastytrade/skills/earnings-calendars /root/.claude/skills/earnings-calendars
 

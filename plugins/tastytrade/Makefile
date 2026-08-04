@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix format typecheck check selftest test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
+.PHONY: lint lint-fix format typecheck check selftest evals test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
 
 lint:
 	uv run ruff check .
@@ -38,6 +38,13 @@ install-hooks:
 validate-tasks:
 	uv run python evals/generate_tasks.py
 	bash evals/validate_local.sh
+	python3 evals/check_reward.py --selftest
+
+# THE MERGE GATE: drives the tasks with a real agent. Spends model tokens, needs
+# Docker and CLAUDE_CODE_OAUTH_TOKEN. validate-tasks proves the verifiers work;
+# only this proves an agent can actually drive the server and the skill.
+evals:
+	bash evals/run_gate.sh
 
 # Run the mock Tastytrade API on its own, the way the eval benchmark runs it.
 mock-api:
