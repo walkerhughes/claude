@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix format typecheck check test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
+.PHONY: lint lint-fix format typecheck check selftest test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
 
 lint:
 	uv run ruff check .
@@ -12,7 +12,12 @@ format:
 typecheck:
 	uv run mypy src/
 
-check: lint typecheck test-unit
+check: lint typecheck selftest test-unit
+
+# Skill scripts are shipped payload but live outside src/, so pytest never sees
+# them. Each carries its own assertions; this is what runs them.
+selftest:
+	python3 scripts/calendars.py --selftest
 
 test:
 	uv run pytest
