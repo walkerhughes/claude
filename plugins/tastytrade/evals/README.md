@@ -31,6 +31,7 @@ evals/
   job.yaml                # runs the agent over every task
   generate_tasks.py       # regenerates the tasks from the fixtures
   check_reward.py         # gates a harbor result.json on its rewards
+  explain_trials.py       # names each trial and dumps the tool calls behind a failure
   validate_local.sh       # scores every verifier without Harbor or a model
   validate_in_container.sh  # the reward matrix it asserts
 ```
@@ -113,9 +114,22 @@ tools, never called them, read `mock_api/app.py` off disk, and drove the REST AP
 than answer-matching.
 
 For the twelve tool tasks, `process` asks that a `mcp__tastytrade__*` tool was called and
-that nothing reached the mock brokerage directly. For `earnings-implied-move` it asks that
-the skill or its script was used, since an agent that eyeballs the straddle can land close
-enough to pass `outcome` without loading the skill, and an early run did.
+that nothing reached the mock brokerage directly. "Directly" is matched on the mock's port
+rather than on a list of hostnames: it binds every interface, so it answers on `localhost`,
+`127.0.0.1`, `0.0.0.0`, `[::1]`, and the container's own name, and naming two of those let
+the other three through. Nothing else in the image listens on that port.
+
+For `earnings-implied-move` `process` asks that the skill or its script was used, since an
+agent that eyeballs the straddle can land close enough to pass `outcome` without loading
+the skill, and an early run did.
+
+Every task prompt now states the rule `process` scores: use the tools, and an answer
+reached any other way does not count. The first gate run under the split scored `outcome`
+1.0 on all thirteen tasks and lost `process` on six, and those six prompts said only "use
+the Tastytrade MCP tools" without putting anything out of bounds. `place-limit-order`,
+which already spelt it out, scored a clean 1.0; that paragraph is now on every task. The
+wording avoids the host, port, and module name the bypass check greps for, so that an agent
+echoing its instructions into a shell comment cannot fail the check by quoting it.
 
 Both checks fail closed. No trajectory means no evidence the intended route was taken, so
 `process` is 0. That is why the oracle scores `outcome=1, process=0`: it is a shell script,
@@ -147,9 +161,26 @@ export CLAUDE_CODE_OAUTH_TOKEN=...   # claude setup-token
 make evals                           # add HARBOR_API_KEY and EVALS_UPLOAD=1 to upload
 ```
 
+### When it fails
+
+The gate prints each trial by name with its rewards, and for any trial that lost `process`,
+the tool calls the agent made, MCP ones unmarked and everything else flagged `!`. That list
+*is* the `process` score, so it is usually the whole diagnosis:
+
+```
+== dividend-lookup: outcome=1.0, process=0.5
+   3 tool call(s), 1 through the MCP server:
+   ! Bash {"command": "curl -s http://0.0.0.0:8080/market-metrics"}
+     mcp__tastytrade__get_market_data {"symbols": ["AAPL"], "include": ["dividends"]}
+```
+
+It used to `cat` the verifier output instead, which printed thirteen anonymous pairs of
+numbers: you could see that six tasks lost `process` and not which six. Recovering that
+meant downloading the CI artifact, which expires after seven days.
+
 ## Check the verifiers without Harbor
 
-`validate_local.sh` scores every task's real verifier against three synthetic trajectories
+`validate_local.sh` scores every task's real verifier against four synthetic trajectories
 and asserts the whole reward matrix. No model, no Harbor, no API key:
 
 | case | answer | trajectory | outcome | process |
@@ -157,12 +188,16 @@ and asserts the whole reward matrix. No model, no Harbor, no API key:
 | solved | oracle | took the intended route | 1 | 1 |
 | empty | none | none | 0 | 0 |
 | bypassed | oracle | went round the server | 1 | 0 |
+| bypassed-alt | oracle | went round it another way | 1 | 0 |
 
-The third row is the point, and it is what `harbor run -a oracle` cannot tell you.
+The last two rows are the point, and they are what `harbor run -a oracle` cannot tell you.
+`bypassed-alt` exists because one spelling of a bypass proves only that one spelling is
+caught: it reaches the mock on an address the first check's hostname list did not name, and
+for the skill task it does the arithmetic inline, which leaves no distinctive string at all.
 
 ```bash
 make validate-tasks
-# 39 passed, 0 failed
+# 52 passed, 0 failed
 ```
 
 It runs in the bench image rather than on the host, because rewardkit scores these checks

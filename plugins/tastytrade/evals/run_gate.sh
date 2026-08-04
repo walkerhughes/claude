@@ -77,8 +77,12 @@ fi
 
 result="$OUT/$JOB_NAME/result.json"
 if ! python3 "$ROOT/evals/check_reward.py" "$result" "$JOB_NAME" --min-mean "$MIN_MEAN"; then
-    echo "--- verifier output ---" >&2
-    cat "$OUT/$JOB_NAME"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+    # Per trial, named, with the agent's tool calls for anything that lost
+    # `process`. A bare `cat` of the verifier output prints thirteen anonymous
+    # pairs of numbers, which says how many tasks failed and nothing about
+    # which or why.
+    echo "--- trials ---" >&2
+    python3 "$ROOT/evals/explain_trials.py" "$OUT/$JOB_NAME" >&2 || true
     die "the eval gate did not clear $MIN_MEAN"
 fi
 

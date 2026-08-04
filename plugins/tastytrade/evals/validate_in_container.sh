@@ -3,14 +3,20 @@
 # real rewardkit verifier against three synthetic trajectories and asserts the
 # reward matrix.
 #
-#   case          answer      trajectory                 outcome  process
-#   ------------  ----------  -------------------------  -------  -------
-#   solved        oracle      took the intended route          1        1
-#   empty         none        none                             0        0
-#   bypassed      oracle      went round the server            1        0
+#   case          answer      trajectory                    outcome  process
+#   ------------  ----------  ----------------------------  -------  -------
+#   solved        oracle      took the intended route             1        1
+#   empty         none        none                                0        0
+#   bypassed      oracle      went round the server               1        0
+#   bypassed-alt  oracle      went round it another way           1        0
 #
-# The third row is the point. Before the split, "bypassed" scored a clean 1.0
-# and a real gate run did exactly that: right answer, server never touched.
+# The last two rows are the point. Before the split, "bypassed" scored a clean
+# 1.0 and a real gate run did exactly that: right answer, server never touched.
+#
+# "bypassed-alt" exists because one spelling of a bypass proves only that one
+# spelling is caught. The mock binds every interface, so it answers on more
+# addresses than a host-matching check can enumerate, and hand arithmetic on the
+# chain leaves no distinctive string at all.
 #
 # Expects the repo at /work. Nothing here calls a model or the network.
 set -uo pipefail
@@ -24,8 +30,15 @@ fail=0
 # skill task needs no edit here.
 mcp_good='{"steps":[{"tool_calls":[{"function_name":"mcp__tastytrade__get_portfolio","arguments":{}}]}]}'
 mcp_bypass='{"steps":[{"tool_calls":[{"function_name":"Bash","arguments":{"command":"curl -s http://localhost:8080/customers/me/accounts"}}]}]}'
+# The same bypass through an address the old host-list did not name. The mock
+# binds 0.0.0.0, so this reaches it just as well as localhost does.
+mcp_bypass_alt='{"steps":[{"tool_calls":[{"function_name":"Bash","arguments":{"command":"curl -s http://0.0.0.0:8080/customers/me/accounts"}}]}]}'
 skill_good='{"steps":[{"tool_calls":[{"function_name":"Bash","arguments":{"command":"python3 /opt/tastytrade/scripts/calendars.py fit chain.json"}}]}]}'
 skill_bypass='{"steps":[{"tool_calls":[{"function_name":"Read","arguments":{"file_path":"/opt/tastytrade/skills/earnings-calendars/reference/pltr-2026-08-03.json"}}]}]}'
+# Eyeballing the straddle: no skill, no script, and nothing to pattern-match on
+# but the absence of the intended route. This is the run that scored 1.0 before
+# the split existed.
+skill_bypass_alt='{"steps":[{"tool_calls":[{"function_name":"Bash","arguments":{"command":"python3 -c \"print((2.34 + 2.62) / 125.64 * 100)\""}}]}]}'
 
 # Score one task against one trajectory. Echoes "<outcome> <process>".
 score() {
@@ -77,14 +90,17 @@ for dir in "$TASKS"/*/; do
     if grep -q "earnings-calendars" "$dir/tests/process/check.py" 2> /dev/null; then
         good=$skill_good
         bypass=$skill_bypass
+        bypass_alt=$skill_bypass_alt
     else
         good=$mcp_good
         bypass=$mcp_bypass
+        bypass_alt=$mcp_bypass_alt
     fi
 
-    expect "$task" solved   "$(score "$task" "$good" yes)"   "1.0 1.0"
-    expect "$task" empty    "$(score "$task" '' no)"         "0.0 0.0"
-    expect "$task" bypassed "$(score "$task" "$bypass" yes)" "1.0 0.0"
+    expect "$task" solved       "$(score "$task" "$good" yes)"       "1.0 1.0"
+    expect "$task" empty        "$(score "$task" '' no)"             "0.0 0.0"
+    expect "$task" bypassed     "$(score "$task" "$bypass" yes)"     "1.0 0.0"
+    expect "$task" bypassed-alt "$(score "$task" "$bypass_alt" yes)" "1.0 0.0"
 done
 
 echo

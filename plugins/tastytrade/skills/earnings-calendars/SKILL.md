@@ -1,6 +1,6 @@
 ---
 name: earnings-calendars
-description: Analyse an option chain for calendar-spread opportunities around an earnings event, and rank the candidates by risk-adjusted return. Decomposes the vol term structure into base vol plus an event jump, prices every calendar against three move regimes with real bid/ask, and screens on whether the profit band covers the implied move. Use when the user asks about calendar or double-calendar spreads into earnings, whether an earnings vol crush is worth selling, how a name's implied move compares to its history, or wants an earnings options chain analysed or ranked.
+description: Analyse an option chain for calendar-spread opportunities around an earnings event, and rank the candidates by risk-adjusted return. Decomposes the vol term structure into base vol plus an event jump, which also yields the expected move the market is pricing for the event alone rather than for the front expiry's total vol. Prices every calendar against three move regimes with real bid/ask, and screens on whether the profit band covers the implied move. Use when the user asks about calendar or double-calendar spreads into earnings, whether an earnings vol crush is worth selling, how big a move the options are implying for an upcoming report, how a name's implied move compares to its history, or wants an earnings options chain analysed or ranked.
 ---
 
 # Earnings calendars
@@ -64,6 +64,10 @@ strikes look cheapest at mid and are often quoted 50c wide.
 writeup, because the "calm" and "history" regimes become guesses without it.
 
 `reference/pltr-2026-08-03.json` is a complete worked example.
+
+If you were handed a chain file that is already in this shape, steps 1 and 2 are done:
+go straight to the fit. `history` is the only field worth adding, and only if you can
+find the numbers.
 
 ## 4. Fit, and apply the gate
 
