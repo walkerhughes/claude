@@ -2,7 +2,7 @@
 description: Learn my writing voice through a labeling loop, and build a skill that translates Claude's output into it.
 ---
 
-Run the voice-learning loop using the `me` skill.
+Run the voice-learning loop using the `learn` skill.
 
 Start by reporting where things stand, so a returning user resumes instead of
 starting over:
