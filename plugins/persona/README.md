@@ -7,11 +7,13 @@ em dashes. It applies immediately after install, with nothing to set up. Say
 "humanoid", ask for something in plain English, or tell Claude a response was
 too jargon-heavy.
 
-**`me`** is the personal one. It learns *your* voice from your own writing
-and builds a translation skill specific to you. That takes about ten minutes of
-labeling, described below.
+**`learn`** is the personal one. It learns *your* voice from your own writing
+and writes a third skill, **`me`**, which is the one that actually does the
+translating. `learn` runs once and takes about ten minutes; `me` is what you
+keep. It is generated rather than shipped, because it can only be written from
+your writing.
 
-Use the first if you want better prose today. Use the second if you want prose
+Use `humanoid` if you want better prose today. Run `learn` if you want prose
 that sounds like you specifically.
 
 ## Learning your voice
@@ -24,7 +26,7 @@ times, the skill is done.
 ### Use
 
 ```
-/me
+/learn
 ```
 
 That's it. Claude drives the whole loop and tells you what to do at each step.
@@ -33,13 +35,13 @@ Saying "learn my voice" or "make this sound like me" triggers the same skill.
 Point it at writing outside your transcripts, which is worth doing:
 
 ```
-/me ~/notes ~/drafts
+/learn ~/notes ~/drafts
 ```
 
 Expect to spend about ten minutes labeling. You can stop partway and resume:
-`/me` picks up where you left off.
+`/learn` picks up where you left off.
 
-Output lands in `~/.claude/skills/persona-voice/SKILL.md`, which Claude then
+Output lands in `~/.claude/skills/me/SKILL.md`, which Claude then
 uses automatically whenever you ask for text in your voice. Labels live in
 `~/.claude/persona/state.json`.
 

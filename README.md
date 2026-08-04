@@ -21,9 +21,9 @@ Plugins that ship [skills](https://code.claude.com/docs/en/skills) instead of a 
 
 | Plugin | Skills | What it does |
 |--------|--------|--------------|
-| [`persona`](plugins/persona/) | `humanoid`, `me` | Write in your own voice. `humanoid` is plain-language guidance that applies the moment it is installed. `me` runs a local labeling loop that learns your voice from your own writing and generates a third skill, `persona-voice`, specific to you. |
+| [`persona`](plugins/persona/) | `humanoid`, `learn` | Write in your own voice. `humanoid` is plain-language guidance that applies the moment it is installed. `learn` runs a local labeling loop over your own writing and generates a third skill, `me`, which is the one that translates into your voice. |
 
-The loop behind `me` is generator/discriminator: Claude drafts a voice skill from writing you label, isolated subagents use only that skill to produce candidate passages, and you judge them blind against your real writing. It stops once Claude passes as you three times. Everything runs on `127.0.0.1` against files already on disk, so no writing is uploaded and the subagents never see the corpus.
+`me` is generated rather than shipped, because it can only be written from your writing. The loop behind `learn` is generator/discriminator: Claude drafts `me` from writing you label, isolated subagents use only that skill to produce candidate passages, and you judge them blind against your real writing. It stops once Claude passes as you three times. Everything runs on `127.0.0.1` against files already on disk, so no writing is uploaded and the subagents never see the corpus.
 
 ## Install a plugin
 
