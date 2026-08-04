@@ -123,13 +123,30 @@ For `earnings-implied-move` `process` asks that the skill or its script was used
 agent that eyeballs the straddle can land close enough to pass `outcome` without loading
 the skill, and an early run did.
 
-Every task prompt now states the rule `process` scores: use the tools, and an answer
-reached any other way does not count. The first gate run under the split scored `outcome`
-1.0 on all thirteen tasks and lost `process` on six, and those six prompts said only "use
-the Tastytrade MCP tools" without putting anything out of bounds. `place-limit-order`,
-which already spelt it out, scored a clean 1.0; that paragraph is now on every task. The
-wording avoids the host, port, and module name the bypass check greps for, so that an agent
-echoing its instructions into a shell comment cannot fail the check by quoting it.
+A delegated call does not count. A subagent keeps its own transcript and returns only its
+result, so the trajectory shows an `Agent` call and no tool; two trials fetched the right
+answer that way and scored 0.5. That is the correct verdict on the evidence rather than a
+gap to paper over -- "a delegate says it called the server" is not a record of this run
+calling it -- so the instruction tells the agent to make the call itself.
+
+Every task prompt states the rule `process` scores, and each paragraph of it is there
+because a gate run failed without it. The first run under the split scored `outcome` 1.0
+on all thirteen tasks and lost `process` on six, with every prompt saying only "use the
+Tastytrade MCP tools" and putting nothing out of bounds. Saying it explicitly fixed two of
+the six. The remaining four all failed the same way, and it was not the way anyone
+expected: each opened with `ToolSearch {"query": "tastytrade"}` and then never called a
+tool. One ran `Bash: mcp__tastytrade__get_option_chain --symbol SPY ...` as a shell
+command. Two delegated. `preview-vertical-spread` spent 44 calls trying to reach the MCP
+over a socket, a subprocess, and an SDK import, having already loaded the schema, and hit
+the agent timeout -- which took `outcome` down with it, 1.0 to 0.0.
+
+So the confusion was never about which tool or which arguments. It was about how to invoke
+an MCP tool at all when its schema is deferred rather than listed, and the prompt now says:
+load it with `ToolSearch`, then call it like any other tool, and no shell command or Python
+import can substitute.
+
+The wording avoids the host, port, and module name the bypass check greps for, so that an
+agent echoing its instructions into a shell comment cannot fail the check by quoting it.
 
 Both checks fail closed. No trajectory means no evidence the intended route was taken, so
 `process` is 0. That is why the oracle scores `outcome=1, process=0`: it is a shell script,

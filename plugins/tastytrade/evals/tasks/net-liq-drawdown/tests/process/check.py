@@ -56,6 +56,18 @@ BYPASS = re.compile(r":8080\b|\bmock_api\b", re.IGNORECASE)
 
 @criterion(description="Agent called a tastytrade MCP tool")
 def used_mcp_server(workspace: Path) -> bool:
+    """A tastytrade tool call in *this* trajectory.
+
+    Which means a call delegated to a subagent does not count: the subagent
+    keeps its own transcript and only its result comes back, so the trajectory
+    shows an `Agent` call and no tool. Two trials reached the right answer that
+    way and scored 0.5 here.
+
+    That is the correct verdict on the evidence rather than a gap to paper
+    over. `process` is a claim about what this run can be shown to have done,
+    and "a delegate says it called the server" is not that. The instruction
+    tells the agent to make the call itself.
+    """
     return any(_name(call).startswith(MCP_PREFIX) for call in _calls())
 
 
