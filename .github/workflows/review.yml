@@ -33,16 +33,18 @@ concurrency:
 
 jobs:
   review:
-    # PR comments only, and only ones that open with `/review`. The action does
-    # its own trigger-phrase match; this `if` is what keeps a runner from spinning
-    # up for every other comment on the repo.
+    # PR comments only, only ones that open with `/review`, and only from the
+    # repo owner. The action does its own trigger-phrase match and its own
+    # write-permission check on the actor; this `if` is what keeps a runner from
+    # spinning up at all for anyone else.
     #
-    # No author_association check here on purpose. The action requires repo write
-    # permission on the actor before it does anything, which is the same gate with
-    # a live permissions lookup instead of a payload field that a fork PR author
-    # can hold. A drive-by commenter gets a runner start and an immediate refusal.
+    # ponytail: one hardcoded login rather than a list or a team lookup. Add
+    # `|| github.event.comment.user.login == 'someone'` when there is a second
+    # person to add, and reach for a team membership check only if that list
+    # starts needing maintenance.
     if: >-
       github.event.issue.pull_request != null &&
+      github.event.comment.user.login == 'walkerhughes' &&
       startsWith(github.event.comment.body, '/review')
     runs-on: ubuntu-latest
     permissions:
@@ -50,6 +52,24 @@ jobs:
       pull-requests: write # post the review and its inline comments
       issues: write # post the tracking comment
     steps:
+      # First, before the checkout and before the token probe, so the comment is
+      # acknowledged the moment the run starts rather than a minute into it. The
+      # action posts a tracking comment too, but that lands after it has set up
+      # bun, the CLI, and the plugin.
+      #
+      # `eyes`, not a checkmark: the GitHub reactions API only accepts +1, -1,
+      # laugh, confused, heart, hooray, rocket, and eyes. 👀 also reads as
+      # underway rather than as a passing review, which is the wrong thing to say
+      # before the review has run.
+      - name: React so the comment shows the review is underway
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api --silent --method POST \
+            "repos/${{ github.repository }}/issues/comments/$COMMENT_ID/reactions" \
+            -f content=eyes
+
       - uses: actions/checkout@v4
 
       # Same probe as tastytrade.yml. A setup-token credential is long-lived but
