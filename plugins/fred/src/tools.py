@@ -11,10 +11,17 @@ import json
 import httpx
 from mcp.server import MCPServer
 
-from . import shaping
+from . import dates, shaping
 from .client import FredClient
 from .errors import guarded_tool
-from .schemas import GetSeriesArgs, ObservationArgs, SearchArgs
+from .schemas import CalendarArgs, GetSeriesArgs, ObservationArgs, RevisionArgs, SearchArgs
+
+# ALFRED's real-time window. Vintage requests need one that spans the whole record;
+# with the default (today to today) FRED answers output_type=2 and 4 with
+# "No vintage dates exist for the specified real-time period", which reads like the
+# series has no revision history rather than like a missing parameter. Every vintage
+# call here sets it, which is most of what get_revisions is for.
+_ALL_TIME = {"realtime_start": "1776-07-04", "realtime_end": "9999-12-31"}
 
 _client: FredClient | None = None
 
@@ -196,6 +203,129 @@ async def _get_observations(args: ObservationArgs) -> dict:
     return result
 
 
+async def _revisions_for_one_date(args: RevisionArgs) -> dict:
+    """The full revision history of a single observation."""
+    payload = await get_client().get(
+        "/series/observations",
+        series_id=args.series_id,
+        output_type=2,  # one column per vintage
+        observation_start=args.observation_date,
+        observation_end=args.observation_date,
+        **_ALL_TIME,
+    )
+    rows = payload.get("observations", [])
+    if not rows:
+        return {
+            "series_id": args.series_id,
+            "observation_date": args.observation_date,
+            "revisions": [],
+            "note": "No observation on that date. Check the date against the series' frequency "
+            "with get_series; quarterly dates are the first day of the quarter.",
+        }
+
+    history = shaping.vintage_history(rows[0], args.series_id)
+    result: dict[str, object] = {
+        "series_id": args.series_id,
+        "observation_date": args.observation_date,
+        "revisions": history,
+        "revision_count": max(0, len(history) - 1),
+    }
+    if history:
+        result["initial"] = history[0]
+        result["current"] = history[-1]
+    return result
+
+
+async def _revision_overview(args: RevisionArgs) -> dict:
+    """Initial print against current value, across the most recent observations."""
+    client = get_client()
+    initial, current, vintages = await asyncio.gather(
+        client.get(
+            "/series/observations",
+            series_id=args.series_id,
+            output_type=4,  # initial release only
+            limit=args.limit,
+            sort_order="desc",
+            **_ALL_TIME,
+        ),
+        client.get("/series/observations", series_id=args.series_id, limit=args.limit, sort_order="desc"),
+        client.get("/series/vintagedates", series_id=args.series_id, limit=1, sort_order="desc"),
+    )
+
+    rows = shaping.revision_rows(shaping.observation_pairs(initial), shaping.observation_pairs(current))
+    vintage_dates = vintages.get("vintage_dates") or []
+    return {
+        "series_id": args.series_id,
+        "observations": rows,
+        "revised": sum(1 for row in rows if row.get("revision")),
+        "vintages": {"count": vintages.get("count"), "latest": vintage_dates[0] if vintage_dates else None},
+        "note": "initial is the number as first published; current is the number today. "
+        "Pass observation_date for the full revision history of one of these.",
+    }
+
+
+async def _fetch_release_dates(args: CalendarArgs, start: str, end: str, future: bool) -> dict:
+    params: dict[str, object] = {
+        "realtime_start": start,
+        "realtime_end": end,
+        "sort_order": "asc",
+        "limit": args.limit,
+    }
+    # Without this, FRED returns only dates that have already produced data, so the
+    # whole "what is scheduled next" half of the question silently comes back empty.
+    if future:
+        params["include_release_dates_with_no_data"] = True
+    if args.release_id is not None:
+        return await get_client().get("/release/dates", release_id=args.release_id, **params)
+    return await get_client().get("/releases/dates", **params)
+
+
+def _calendar_rows(payload: dict) -> list[dict]:
+    rows = []
+    for entry in payload.get("release_dates", []):
+        row: dict = {"date": entry.get("date"), "release_id": entry.get("release_id")}
+        if entry.get("release_name"):
+            row["release_name"] = entry["release_name"]
+        rows.append(row)
+    return rows
+
+
+async def _release_calendar(args: CalendarArgs) -> dict:
+    """Fetch the two halves of the window separately, then report them separately.
+
+    One request for the whole window would be truncated by ``limit`` before the split,
+    and since FRED returns dates ascending, the truncation lands entirely on the
+    future. That produced "50 released, 0 upcoming" for a window with 150 scheduled
+    releases in it: a confidently empty answer to half the question being asked.
+    """
+    today = dates.today().isoformat()
+    tomorrow = dates.days_after(dates.today(), 1).isoformat()
+
+    past = _fetch_release_dates(args, args.start, min(args.end, today), future=False) if args.start <= today else None
+    ahead = (
+        _fetch_release_dates(args, max(args.start, tomorrow), args.end, future=True) if args.end > today else None
+    )
+    release = get_client().get("/release", release_id=args.release_id) if args.release_id is not None else None
+
+    pending = [task for task in (past, ahead, release) if task is not None]
+    done = iter(await asyncio.gather(*pending))
+    past_payload = next(done) if past is not None else {}
+    ahead_payload = next(done) if ahead is not None else {}
+    release_payload = next(done) if release is not None else None
+
+    result: dict[str, object] = {
+        "window": {"start": args.start, "end": args.end},
+        "today": today,
+        "released": _calendar_rows(past_payload),
+        "upcoming": _calendar_rows(ahead_payload),
+        # FRED's totals for each half, so a limited page is visibly a page.
+        "totals": {"released": past_payload.get("count", 0), "upcoming": ahead_payload.get("count", 0)},
+    }
+    if release_payload is not None:
+        result["release"] = shaping.trim_release(shaping.first_or_empty(release_payload, "releases"))
+    return result
+
+
 def register_all(mcp: MCPServer) -> None:
     """Register every tool on the given MCP server."""
 
@@ -320,3 +450,59 @@ def register_all(mcp: MCPServer) -> None:
             }
         )
         return fmt(await _get_observations(args))
+
+    @mcp.tool()
+    @guarded_tool
+    async def get_revisions(series_id: str, observation_date: str = "", limit: int = 10) -> str:
+        """What a number was first reported as, and how it has been revised since.
+
+        FRED keeps every vintage of every series (this is ALFRED). Answers questions
+        like "what did Q3 GDP originally print at" and "does this series get revised
+        much", which the current values alone cannot.
+
+        Two modes:
+          observation_date set  the full revision history of that one data point,
+                                with the repeated vintages collapsed so you see the
+                                changes rather than one column per publication
+          observation_date omitted  first-printed against current for the most recent
+                                observations, which shows the revision pattern
+
+        observation_date takes the same forms as elsewhere, and must be an observation
+        date rather than a publication date: quarterly series are dated to the first
+        day of the quarter, monthly to the first of the month.
+
+        The real-time window this needs is set for you. Asking FRED for vintages
+        without it fails with a message about no vintage dates existing, which reads
+        like the series has no history when the parameter is simply missing.
+        """
+        args = RevisionArgs.model_validate(
+            {"series_id": series_id, "observation_date": observation_date, "limit": limit}
+        )
+        if args.observation_date:
+            return fmt(await _revisions_for_one_date(args))
+        return fmt(await _revision_overview(args))
+
+    @mcp.tool()
+    @guarded_tool
+    async def get_release_calendar(
+        start: str = "",
+        end: str = "",
+        release_id: int | None = None,
+        limit: int = 50,
+    ) -> str:
+        """What economic data just came out, and what is scheduled next.
+
+        Splits results into "released" and "upcoming" around today, because those are
+        two different questions and comparing dates to tell them apart is work the
+        caller should not have to do.
+
+        Defaults to the last 7 days and the next 14. start and end take the same forms
+        as get_observations ("today", "5y", "2026-08", a full date).
+
+        release_id narrows to one publication's schedule, e.g. 50 for the Employment
+        Situation. Release IDs come from this tool or from get_series(include=
+        ["release"]), and feed back into search_series(release_id=...) to list every
+        series a release publishes.
+        """
+        args = CalendarArgs.model_validate({"start": start, "end": end, "release_id": release_id, "limit": limit})
+        return fmt(await _release_calendar(args))

@@ -152,6 +152,64 @@ def summarize(pairs: list[tuple[str, Number]]) -> dict:
     return summary
 
 
+# --- revisions ---------------------------------------------------------------------
+#
+# With output_type=2 FRED returns one column per vintage, named <SERIES>_<YYYYMMDD>:
+#
+#     {"date": "2025-07-01", "GDPC1_20251223": "24024.957", "GDPC1_20260122": "24026.834",
+#      "GDPC1_20260220": "24026.834", ... nine in total}
+#
+# Seven of those nine are the same number. A vintage exists for every release of the
+# series, not for every change to this observation, so most columns repeat the one
+# before. Collapsing them turns nine columns into "first printed as X, revised once to
+# Y", which is the actual answer.
+
+
+def vintage_history(row: dict, series_id: str) -> list[dict]:
+    """Collapse a vintage row into the points where the value actually changed."""
+    vintages: list[tuple[str, Number]] = []
+    prefix = f"{series_id}_"
+    for key, raw in row.items():
+        if not key.startswith(prefix):
+            continue
+        stamp = key[len(prefix) :]
+        if len(stamp) != 8 or not stamp.isdigit():
+            continue
+        vintages.append((f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:]}", parse_value(raw)))
+    vintages.sort()
+
+    history: list[dict] = []
+    for vintage, value in vintages:
+        if history and history[-1]["value"] == value:
+            continue
+        entry: dict[str, Any] = {"vintage": vintage, "value": value}
+        if history:
+            previous = history[-1]["value"]
+            if previous is not None and value is not None:
+                entry["change"] = round(value - previous, 6)
+                if previous:
+                    entry["pct_change"] = round((value - previous) / abs(previous) * 100, 4)
+        history.append(entry)
+    return history
+
+
+def revision_rows(initial: list[tuple[str, Number]], current: list[tuple[str, Number]]) -> list[dict]:
+    """Join first-printed against latest, one row per observation date."""
+    latest = dict(current)
+    rows: list[dict] = []
+    for date, first in sorted(initial):
+        if date not in latest:
+            continue
+        now = latest[date]
+        row: dict[str, Any] = {"date": date, "initial": first, "current": now}
+        if first is not None and now is not None:
+            row["revision"] = round(now - first, 6)
+            if first:
+                row["revision_pct"] = round((now - first) / abs(first) * 100, 4)
+        rows.append(row)
+    return rows
+
+
 def downsample(dates: list[str], columns: dict[str, list[Number]], max_points: int) -> tuple[list, dict, int]:
     """Thin to evenly spaced points, always keeping the first and the last.
 

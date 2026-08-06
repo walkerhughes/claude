@@ -341,3 +341,68 @@ class ObservationArgs(BaseModel):
     @property
     def units_meaning(self) -> str:
         return UNITS_MEANING[self.units]
+
+
+class RevisionArgs(BaseModel):
+    """Arguments for get_revisions."""
+
+    series_id: str
+    observation_date: str = ""
+    limit: int = Field(default=10, ge=1, le=100)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _correct(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if isinstance(data.get("series_id"), str):
+            ids = normalize_series_ids(data["series_id"])
+            data["series_id"] = ids[0] if ids else ""
+        if data.get("observation_date") is not None:
+            data["observation_date"] = dates.parse(data["observation_date"], field="observation_date")
+        return data
+
+    @field_validator("series_id")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value:
+            raise ValueError("series_id is required; find one with search_series")
+        return value
+
+
+class CalendarArgs(BaseModel):
+    """Arguments for get_release_calendar."""
+
+    start: str = ""
+    end: str = ""
+    release_id: int | None = None
+    limit: int = Field(default=50, ge=1, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _correct(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        for field in ("start", "end"):
+            if data.get(field) is not None:
+                data[field] = dates.parse(data[field], field=field)
+        return data
+
+    @model_validator(mode="after")
+    def _default_window(self) -> "CalendarArgs":
+        # "What just came out and what is next" is the question, so the default window
+        # straddles today rather than running from the beginning of the record.
+        today = dates.today()
+        if not self.start:
+            object.__setattr__(self, "start", dates.days_before(today, 7).isoformat())
+        if not self.end:
+            object.__setattr__(self, "end", dates.days_after(today, 14).isoformat())
+        if self.start > self.end:
+            raise ValueError(f"start ({self.start}) is after end ({self.end}); swap them")
+        return self
+
+    @property
+    def reaches_into_the_future(self) -> bool:
+        return self.end >= dates.today().isoformat()
