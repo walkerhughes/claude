@@ -10,6 +10,8 @@ the tools send the parameters they claim to (the real-time window on a vintage r
 the filter_variable pairing, the popularity ordering).
 """
 
+from datetime import date
+
 import httpx
 
 UNRATE = {
@@ -71,6 +73,46 @@ GDPC1 = {
 
 SERIES = {s["id"]: s for s in (UNRATE, CPIAUCSL, UNRATENSA, GDPC1)}
 
+# Monthly, with a "." in the middle: FRED's missing-value marker, not a null.
+UNRATE_OBS = [
+    ("2025-01-01", "4.0"),
+    ("2025-02-01", "4.1"),
+    ("2025-03-01", "."),
+    ("2025-04-01", "4.2"),
+    ("2025-05-01", "4.4"),
+    ("2025-06-01", "4.3"),
+]
+
+# Quarterly, so it lines up with UNRATE on only two of its dates. This is the pair the
+# alignment tests use: a union index with nulls where a series has no observation.
+GDPC1_OBS = [
+    ("2025-01-01", "23000.0"),
+    ("2025-04-01", "23150.5"),
+]
+
+# A long daily series for the downsampling tests. The knots put the peak and the trough
+# in the *interior*, away from the first and last points that downsampling always keeps.
+# That is the whole point: a summary computed after thinning would report the extremes
+# of the sample, and with extremes at the endpoints the test could not tell the
+# difference.
+_DAILY_KNOTS = [(0, 200.0), (80, 300.0), (200, 50.0), (365, 180.0)]
+
+
+def _daily_series() -> list[tuple[str, str]]:
+    values: list[float] = []
+    for (i0, v0), (i1, v1) in zip(_DAILY_KNOTS, _DAILY_KNOTS[1:]):
+        values.extend(v0 + (v1 - v0) * (i - i0) / (i1 - i0) for i in range(i0, i1))
+    values.append(_DAILY_KNOTS[-1][1])
+
+    first = date(2020, 1, 1).toordinal()
+    return [(date.fromordinal(first + i).isoformat(), f"{v:.4f}") for i, v in enumerate(values)]
+
+
+DAILY_OBS = _daily_series()
+DAILY_MIN, DAILY_MAX = 50.0, 300.0
+
+OBSERVATIONS = {"UNRATE": UNRATE_OBS, "GDPC1": GDPC1_OBS, "CPIAUCSL": UNRATE_OBS, "DGS10": DAILY_OBS}
+
 
 class MockFred:
     """Routes FRED paths to captured payloads and records every request."""
@@ -97,6 +139,8 @@ class MockFred:
         # "/series" and would otherwise be swallowed by this branch.
         if path.endswith("/fred/series"):
             return self._one_series(params.get("series_id", ""))
+        if path.endswith("/series/observations"):
+            return self._observations(params)
         if path.endswith("/series/search"):
             return self._series_list(params, [UNRATE, UNRATENSA, CPIAUCSL, GDPC1])
         if path.endswith("/release/series") or path.endswith("/category/series"):
@@ -140,6 +184,33 @@ class MockFred:
                 }
             )
         return _error(404, f"Not Found. No handler for {path}.")
+
+    def _observations(self, params: dict[str, str]) -> httpx.Response:
+        series_id = params.get("series_id", "")
+        if series_id not in OBSERVATIONS:
+            return _error(400, "Bad Request.  The series does not exist.")
+
+        rows = OBSERVATIONS[series_id]
+        start, end = params.get("observation_start"), params.get("observation_end")
+        if start:
+            rows = [r for r in rows if r[0] >= start]
+        if end:
+            rows = [r for r in rows if r[0] <= end]
+
+        # Real-time fields carry the same value on every row, which is the redundancy
+        # the columnar shaping exists to remove; the fixture reproduces it faithfully.
+        return _ok(
+            {
+                "realtime_start": "2026-08-05",
+                "realtime_end": "2026-08-05",
+                "units": params.get("units", "lin"),
+                "count": len(rows),
+                "observations": [
+                    {"realtime_start": "2026-08-05", "realtime_end": "2026-08-05", "date": d, "value": v}
+                    for d, v in rows
+                ],
+            }
+        )
 
     def _one_series(self, series_id: str) -> httpx.Response:
         if series_id not in SERIES:

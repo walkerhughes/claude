@@ -8,7 +8,7 @@ the fix.
 import pytest
 from pydantic import ValidationError
 
-from src.schemas import GetSeriesArgs, SearchArgs, normalize_series_ids
+from src.schemas import GetSeriesArgs, ObservationArgs, SearchArgs, normalize_series_ids
 
 pytestmark = pytest.mark.unit
 
@@ -172,3 +172,94 @@ class TestSearchLimits:
     def test_limit_is_bounded(self, limit):
         with pytest.raises(ValidationError):
             SearchArgs(query="x", limit=limit)
+
+
+class TestUnitsCorrection:
+    """The single most valuable table in the correction layer: nobody remembers pc1."""
+
+    @pytest.mark.parametrize(
+        "written,expected",
+        [
+            ("yoy", "pc1"),
+            ("YoY", "pc1"),
+            ("year over year", "pc1"),
+            ("year-over-year", "pc1"),
+            ("percent change from a year ago", "pc1"),
+            ("inflation", "pc1"),
+            ("pc1", "pc1"),
+            ("percent change", "pch"),
+            ("pct_change", "pch"),
+            ("mom", "pch"),
+            ("month over month", "pch"),
+            ("change", "chg"),
+            ("diff", "chg"),
+            ("change from a year ago", "ch1"),
+            ("annualized", "pca"),
+            ("saar", "pca"),
+            ("level", "lin"),
+            ("levels", "lin"),
+            ("raw", "lin"),
+            ("none", "lin"),
+            ("", "lin"),
+            ("natural log", "log"),
+            ("ln", "log"),
+        ],
+    )
+    def test_phrases_become_fred_codes(self, written, expected):
+        assert ObservationArgs(series_ids="UNRATE", units=written).units == expected
+
+    def test_every_code_carries_its_meaning(self):
+        args = ObservationArgs(series_ids="UNRATE", units="yoy")
+        assert args.units_meaning == "percent change from a year ago"
+
+    def test_an_invented_transformation_is_rejected_with_the_real_options(self):
+        with pytest.raises(ValidationError) as exc:
+            ObservationArgs(series_ids="UNRATE", units="cagr")
+        assert "yoy" in str(exc.value)
+
+
+class TestAggregationCorrection:
+    @pytest.mark.parametrize(
+        "written,expected",
+        [("average", "avg"), ("mean", "avg"), ("total", "sum"), ("end of period", "eop"), ("last", "eop")],
+    )
+    def test_words_become_codes(self, written, expected):
+        assert ObservationArgs(series_ids="X", aggregation_method=written).aggregation_method == expected
+
+    def test_unknown_is_rejected(self):
+        with pytest.raises(ValidationError, match="unknown aggregation_method"):
+            ObservationArgs(series_ids="X", aggregation_method="median")
+
+
+class TestObservationRange:
+    def test_relative_dates_are_resolved(self, monkeypatch):
+        from datetime import date
+
+        from src import dates as dates_module
+
+        monkeypatch.setattr(dates_module, "today", lambda: date(2026, 8, 5))
+        args = ObservationArgs(series_ids="UNRATE", start="5y", end="today")
+        assert (args.start, args.end) == ("2021-08-05", "2026-08-05")
+
+    def test_a_backwards_range_is_caught_before_the_api_sees_it(self):
+        with pytest.raises(ValidationError, match="swap them"):
+            ObservationArgs(series_ids="UNRATE", start="2025-01-01", end="2020-01-01")
+
+    def test_an_equal_range_is_fine(self):
+        # One specific observation date is a legitimate request.
+        args = ObservationArgs(series_ids="UNRATE", start="2025-01-01", end="2025-01-01")
+        assert args.start == args.end
+
+    def test_an_unparseable_date_is_guidance_not_a_400(self):
+        with pytest.raises(ValidationError, match="could not be read as a date"):
+            ObservationArgs(series_ids="UNRATE", start="whenever")
+
+    @pytest.mark.parametrize("cap", [1, 2001])
+    def test_max_points_is_bounded(self, cap):
+        with pytest.raises(ValidationError):
+            ObservationArgs(series_ids="UNRATE", max_points=cap)
+
+    def test_a_finer_frequency_is_still_expressible_here(self):
+        # Only FRED knows a series' native frequency, so "finer than the series" is
+        # its call; this layer only rejects frequencies FRED has no code for.
+        assert ObservationArgs(series_ids="UNRATE", frequency="daily").frequency == "d"
