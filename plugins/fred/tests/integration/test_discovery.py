@@ -17,7 +17,7 @@ class TestSearchSeries:
 
     async def test_the_key_is_sent_but_the_count_is_freds(self, call, fred):
         out = await call("search_series", query="unemployment")
-        assert out["count"] == 4
+        assert out["count"] == 5  # the whole search pool
         assert out["returned"] == len(out["series"])
 
     async def test_release_id_switches_endpoint_without_changing_the_shape(self, call, fred):

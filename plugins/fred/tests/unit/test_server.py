@@ -47,9 +47,14 @@ class TestPluginManifest:
         # anyone running it directly gets a permission error.
         assert (ROOT / "scripts" / "start-server.sh").stat().st_mode & 0o111
 
-    def test_the_api_key_is_passed_through(self):
+    def test_every_setting_the_server_reads_is_passed_through(self):
+        """An env var the code honours but .mcp.json drops does nothing once installed.
+
+        FRED_BASE_URL was documented in .env.example, unread by the code, and absent
+        here; two of those three were fixed together, so this pins the third.
+        """
         config = json.loads((ROOT / ".mcp.json").read_text())
-        assert "FRED_API_KEY" in config["mcpServers"]["fred"]["env"]
+        assert set(config["mcpServers"]["fred"]["env"]) == {"FRED_API_KEY", "FRED_BASE_URL", "FRED_LOG_LEVEL"}
 
     def test_plugin_name_matches_the_server_name(self):
         manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())

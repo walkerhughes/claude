@@ -1,0 +1,33 @@
+# Run Claude Code against the server over every task. Harbor records the reward, phase
+# timings, and token and cost totals per trial. Read them with `harbor view jobs`.
+#
+# Before running:
+#   make benchmark-build          # from the plugin root
+#   export CLAUDE_CODE_OAUTH_TOKEN=...
+#   make benchmark
+jobs_dir: jobs
+n_attempts: 3 # trials per task
+
+orchestrator:
+  type: local
+  n_concurrent_trials: 4
+
+environment:
+  type: docker
+# No ANTHROPIC_API_KEY here on purpose. The agent authenticates with
+# CLAUDE_CODE_OAUTH_TOKEN, which harbor's claude-code agent forwards when
+# CLAUDE_FORCE_OAUTH is set. Declaring the key puts an empty ANTHROPIC_API_KEY in
+# the container, the CLI prefers it over the token, and every trial dies on a 401
+# before spending a token. Adding it back on a machine that has one also silently
+# moves the run onto API credits.
+
+agents:
+  - name: claude-code
+    model_name: anthropic/claude-haiku-4-5-20251001
+    mcp_servers:
+      - name: fred
+        transport: stdio
+        command: mcp-server
+
+datasets:
+  - path: ./tasks

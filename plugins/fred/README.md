@@ -92,12 +92,16 @@ What economic data just came out, and what is scheduled next, split around today
 
 ```bash
 uv sync
-make check      # lint, typecheck, unit tests
-make test       # everything
-make coverage   # with a report, 80% floor
+make check           # lint, typecheck, unit tests
+make test            # everything
+make coverage        # with a report, 80% floor
+make validate-tasks  # score every eval verifier against its oracle and each bypass (needs Docker)
+make evals           # THE MERGE GATE: drive the tasks with a real agent (needs Docker + a token)
 ```
 
 Integration tests drive the registered MCP server against a mock FRED built from trimmed real captures. No network and no API key, so the whole suite runs anywhere.
+
+The agent-loop benchmark lives in [`evals/`](evals/): 10 tasks over all five tools, each scoring both whether the answer is right and whether it came through the MCP server rather than round it. See [evals/README.md](evals/README.md).
 
 ## Not here
 
@@ -105,3 +109,4 @@ Integration tests drive the registered MCP server against a mock FRED built from
 - **Tag and category tree browsing.** `search_series` covers the reachable ground; the tree is a UI affordance.
 - **Sources.** Metadata about metadata.
 - **A response cache.** FRED allows 120 requests a minute and the data moves slowly, so nothing is under pressure. See the design doc's deferred work.
+- **Forward date spans.** `"5y"` means five years ago; a forward window needs an absolute end date.

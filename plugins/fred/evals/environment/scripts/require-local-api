@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Refuse to run unless the server points at the local mock. This is the hard stop that
+# keeps the benchmark from ever reaching the real FRED API, whatever the environment
+# happens to say, and so from ever spending a developer's real key on a gate run.
+set -euo pipefail
+case "${FRED_BASE_URL:-}" in
+  http://localhost:* | http://127.0.0.1:*) exit 0 ;;
+esac
+echo "refusing to start: FRED_BASE_URL must point at the local mock (got '${FRED_BASE_URL:-unset}')." >&2
+exit 1

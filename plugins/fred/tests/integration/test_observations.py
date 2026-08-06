@@ -111,6 +111,18 @@ class TestDownsampling:
         assert summary["count"] == len(DAILY_OBS)
         assert summary["observations"] == len(DAILY_OBS)
 
+    async def test_the_extremes_are_not_in_the_returned_points(self, call):
+        """The task `rate-history-max` is only a test if this holds.
+
+        The summary must be the *only* route to the true extremes. An earlier fixture
+        used a broad peak that the sampling grid landed on exactly, so an agent reading
+        the returned points got the right answer and the eval proved nothing.
+        """
+        out = await call("get_observations", series_ids="DGS10")
+        sampled = [v for v in out["values"]["DGS10"] if v is not None]
+        assert max(sampled) < DAILY_MAX
+        assert min(sampled) > DAILY_MIN
+
     async def test_the_first_and_last_dates_survive(self, call):
         out = await call("get_observations", series_ids="DGS10")
         assert out["dates"][0] == DAILY_OBS[0][0]
