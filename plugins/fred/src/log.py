@@ -13,6 +13,11 @@ LOGGER_NAME = "fred-mcp"
 
 def configure_logging(level: str | None = None) -> None:
     """Attach a single stderr handler at the configured level. Idempotent."""
+    # httpx logs every request line at INFO, and FRED takes the API key as a query
+    # parameter, so at INFO the key is written to stderr on every single call. Ours
+    # logs the path only. Raise httpx to WARNING before anything can emit.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel((level or os.environ.get("FRED_LOG_LEVEL") or "INFO").upper())
     logger.propagate = False
