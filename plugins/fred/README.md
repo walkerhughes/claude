@@ -26,7 +26,17 @@ Needs [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds t
 
 A FRED API key is free, takes a minute, and needs no card: <https://fredaccount.stlouisfed.org/apikeys>.
 
-Put it in either place. The environment wins if both are set.
+The easiest way is the slash command:
+
+```
+/fred:auth
+```
+
+It opens your operating system's own password prompt, checks the key against FRED, and writes it to `~/.fred-mcp/credentials.json` with owner-only permissions. Nothing is uploaded, and the key never passes through the conversation: the command runs [`scripts/save-credentials.sh`](scripts/save-credentials.sh), which reads the prompt itself rather than asking the agent to collect it. A key pasted into a chat is in the transcript and in the context window, and neither is something you can rotate away.
+
+Run it again any time to rotate: it always overwrites. A key FRED rejects is refused before the file is touched, so a mistyped rotation cannot cost you a working key.
+
+The two manual routes still work. The environment wins if both are set.
 
 ```bash
 export FRED_API_KEY="your32characterlowercasealnumkey"
@@ -35,6 +45,8 @@ export FRED_API_KEY="your32characterlowercasealnumkey"
 ```bash
 mkdir -p ~/.fred-mcp && printf '{"api_key": "%s"}\n' "$FRED_API_KEY" > ~/.fred-mcp/credentials.json
 ```
+
+The file is usually the more reliable of the two, because a GUI launch of Claude Code does not inherit your shell profile, so an `export` in `.zshrc` never reaches the server.
 
 The key's shape is checked before any request, so a key pasted with a stray quote or capital says so instead of coming back as FRED's message about "the value for variable api_key". The key is never written to a log or an error message.
 

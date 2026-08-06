@@ -10,7 +10,7 @@ Formerly `walkerhughes/mcps`, back when it only held MCP servers.
 
 | Server | What it connects to | Plugin |
 |--------|---------------------|--------|
-| [`fred`](plugins/fred/) | The [FRED API](https://fred.stlouisfed.org/docs/api/fred/): the St. Louis Fed's economic time series, plus revision history and the release calendar (5 tools). | yes |
+| [`fred`](plugins/fred/) | The [FRED API](https://fred.stlouisfed.org/docs/api/fred/): the St. Louis Fed's economic time series, plus revision history and the release calendar (5 tools, and `/fred:auth` to store your key). | yes |
 | [`harbor-hub`](plugins/harbor-hub/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. | yes |
 | [`tastytrade`](plugins/tastytrade/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). | not yet |
 
@@ -38,13 +38,31 @@ Run these as two separate commands, not as one paste: the first opens a prompt t
 /plugin install harbor-hub
 ```
 
-The non-interactive equivalents are more reliable, and are the only way to move an existing install to a new version, since `claude plugin install` no-ops when the plugin is already present:
+The non-interactive equivalents below are more reliable, and are the only way to move an existing install to a new version.
+
+MCP server plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. See each server's README for credentials. Skill-only plugins have no such setup: `persona` needs nothing beyond the `python3` already on your system.
+
+### Updating
+
+Merging to `main` publishes: the marketplace *is* this repo. What each machine then needs is a refresh of its cached copy, which is one command:
 
 ```bash
-claude plugin marketplace update walkerhughes && claude plugin update harbor-hub@walkerhughes
+claude plugin marketplace update walkerhughes
 ```
 
-MCP server plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The first launch builds the server's environment, so give it a moment before the tools appear. A plugin update needs a Claude Code restart, not just an `/mcp` reconnect. See each server's README for credentials. Skill-only plugins have no such setup: `persona` needs nothing beyond the `python3` already on your system.
+Until that runs, a newly added plugin is invisible locally, however many times you try to install it. After it, the two cases differ:
+
+```bash
+claude plugin install fred@walkerhughes
+```
+
+```bash
+claude plugin update tastytrade@walkerhughes
+```
+
+Use `install` for a plugin you do not have yet, `update` for one you already have. `install` no-ops on an existing plugin rather than upgrading it, which reads as "nothing happened" rather than as an error.
+
+Then **restart Claude Code**. A plugin change needs a full restart, not just an `/mcp` reconnect.
 
 ### Shipping a plugin change
 
