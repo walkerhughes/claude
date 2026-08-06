@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Start the mock FRED API on :8080 if it isn't already running. Safe to call more than
+# once, since only the first call actually launches it.
+set -euo pipefail
+
+probe() { curl -sf "http://localhost:8080/fred/series?series_id=UNRATE" > /dev/null 2>&1; }
+
+probe && exit 0
+
+cd /opt/fred
+nohup uv run python -m tests.fixtures.fred_api 8080 > /tmp/mock-fred.log 2>&1 &
+
+for _ in $(seq 1 50); do
+  probe && exit 0
+  sleep 0.2
+done
+echo "mock FRED API failed to start" >&2
+cat /tmp/mock-fred.log >&2
+exit 1

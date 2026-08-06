@@ -1,0 +1,16 @@
+[task]
+name = "fred-mcp/rate-history-max"
+description = "For the 10-year Treasury series DGS10, find the highest value it has ever reached over its entire history in this dataset. Be careful: a long daily series is returned as a sample of its points, and the highest point is not necessarily among the ones you get back. The tool reports the true figure alongside the points."
+
+[metadata]
+suite = "fred-mcp"
+
+[environment]
+docker_image = "fred-bench"
+network_mode = "public"
+
+[agent]
+timeout_sec = 300
+
+[verifier]
+timeout_sec = 60

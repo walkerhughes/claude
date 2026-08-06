@@ -14,3 +14,6 @@ wheels/
 
 # Coverage
 .coverage
+
+# Harbor job output
+evals/jobs/

@@ -1,0 +1,16 @@
+[task]
+name = "fred-mcp/initial-print"
+description = "Real GDP (GDPC1) for the observation dated 2025-01-01 has since been revised. Find the value as it was FIRST published, not the value it holds today."
+
+[metadata]
+suite = "fred-mcp"
+
+[environment]
+docker_image = "fred-bench"
+network_mode = "public"
+
+[agent]
+timeout_sec = 300
+
+[verifier]
+timeout_sec = 60

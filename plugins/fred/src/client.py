@@ -108,7 +108,9 @@ class FredClient:
         # in the tool layer) never raises; a missing key should surface as a guided
         # error from the tool that needed it, not as a server that will not start.
         self._api_key = api_key
-        self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
+        # FRED_BASE_URL is what points the server at a local mock, which is how the
+        # eval benchmark runs without a key and without touching the real API.
+        self.base_url = (base_url or os.environ.get("FRED_BASE_URL") or DEFAULT_BASE_URL).strip().rstrip("/")
         self._transport = transport
         self._http: httpx.AsyncClient | None = None
 

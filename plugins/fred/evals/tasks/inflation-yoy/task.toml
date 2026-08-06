@@ -1,0 +1,16 @@
+[task]
+name = "fred-mcp/inflation-yoy"
+description = "For the CPI series CPIAUCSL, find the most recent year-over-year change, as a percent. The server can compute that transformation for you; do not do the arithmetic by hand."
+
+[metadata]
+suite = "fred-mcp"
+
+[environment]
+docker_image = "fred-bench"
+network_mode = "public"
+
+[agent]
+timeout_sec = 300
+
+[verifier]
+timeout_sec = 60

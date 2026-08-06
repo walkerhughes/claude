@@ -164,16 +164,36 @@ leave a model holding three IDs with no idea which to fix.
 
 ## Evals
 
-Unit-level misuse tests (`tests/unit/test_schemas.py`, `test_dates.py`) feed realistic model
-mistakes through correction and validation and assert the corrections and the suggestion-bearing
-errors. Integration tests drive the registered MCP server against a mock FRED built from trimmed
-real captures, so the shaping is asserted against FRED's shapes rather than invented ones. All of
-it runs in CI with no key and no network.
+Three layers, answering three different questions.
 
-There is no Harbor agent-loop benchmark, unlike the tastytrade server. That one exists because
-order placement makes a wrong answer expensive; FRED is read-only. A benchmark is worth adding once
-the tool surface has settled, and it would measure the table above at the agent loop rather than at
-the payload.
+**Unit-level misuse tests** (`tests/unit/test_schemas.py`, `test_dates.py`) feed realistic model
+mistakes through correction and validation and assert the corrections and the suggestion-bearing
+errors.
+
+**Integration tests** drive the registered MCP server against a mock FRED built from trimmed real
+captures, so the shaping is asserted against FRED's shapes rather than invented ones.
+
+**The Harbor benchmark** (`evals/`) drives Claude Code over 10 tasks covering all five tools and
+fails unless every reward is 1.0. This is the only layer that can catch a server an agent cannot
+drive, which is a different failure from a server that computes the wrong thing. Every task scores
+two rewards: `outcome` (the answer is right) and `process` (it came through `mcp__fred__*`, and
+nothing went round the server).
+
+The split exists because a tastytrade gate run produced a perfect answer without calling a single
+tool: it read the mock's source off disk and drove the backend directly. This plugin has three such
+routes rather than two, since the benchmark runs with the network up and `api.stlouisfed.org` is
+therefore reachable, so `process` matches on the mock's port, the fixture module name, and the real
+API's hostname. `require-local-api` is the hard stop behind that: the server refuses to start
+unless `FRED_BASE_URL` points at localhost, so a benchmark run cannot spend a real key.
+
+One task is worth naming. `rate-history-max` asks for the highest value a long daily series ever
+reached, and the fixture puts that maximum on a single day at an index the downsampler does not
+sample: the summary says 300.0 and the best point actually returned is 199.96, against a tolerance
+of 0.01. It is the summary-before-downsampling claim above, turned into pass or fail.
+
+All three layers use the same fixtures through the same `route()` function, so the benchmark and
+the test suite cannot disagree about what FRED returns. The first two run in CI on every PR with no
+key and no network; `evals/README.md` covers the third.
 
 ## Deferred work
 
@@ -184,3 +204,6 @@ the payload.
 - **Maps/GeoFRED.** Regional data by shape rather than by series.
 - **Paging.** Every tool returns a bounded page with FRED's own total. No cursor, because no
   question so far has needed the second page.
+- **Forward date spans.** `start="5y"` means five years *ago*; there is no spelling for "the next
+  60 days", so a forward window is written out as an absolute date. The calendar's default window
+  already straddles today, which is what the common question needs.

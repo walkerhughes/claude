@@ -143,3 +143,23 @@ class TestGet:
         client = FredClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})))
         with pytest.raises(CredentialsError):
             await client.get("/series")
+
+
+class TestBaseUrl:
+    def test_defaults_to_the_real_api(self):
+        assert FredClient().base_url == "https://api.stlouisfed.org/fred"
+
+    def test_the_environment_can_point_it_at_a_mock(self, monkeypatch):
+        # This is what lets the eval benchmark run against a local mock with no key
+        # and no possibility of reaching the real API. .env.example documented it
+        # before the code read it.
+        monkeypatch.setenv("FRED_BASE_URL", "http://localhost:8080/fred")
+        assert FredClient().base_url == "http://localhost:8080/fred"
+
+    def test_an_explicit_argument_beats_the_environment(self, monkeypatch):
+        monkeypatch.setenv("FRED_BASE_URL", "http://localhost:8080/fred")
+        assert FredClient(base_url="http://other:9/fred").base_url == "http://other:9/fred"
+
+    def test_a_trailing_slash_does_not_double_up(self, monkeypatch):
+        monkeypatch.setenv("FRED_BASE_URL", "http://localhost:8080/fred/ ")
+        assert FredClient().base_url == "http://localhost:8080/fred"

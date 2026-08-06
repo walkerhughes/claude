@@ -6,6 +6,7 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/start-server.sh"],
       "env": {
         "FRED_API_KEY": "${FRED_API_KEY:-}",
+        "FRED_BASE_URL": "${FRED_BASE_URL:-}",
         "FRED_LOG_LEVEL": "${FRED_LOG_LEVEL:-}"
       }
     }

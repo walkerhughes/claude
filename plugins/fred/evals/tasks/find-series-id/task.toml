@@ -1,0 +1,16 @@
+[task]
+name = "fred-mcp/find-series-id"
+description = "Find the FRED series ID for the headline US unemployment rate: the monthly, seasonally adjusted one that is the most widely used series of its kind."
+
+[metadata]
+suite = "fred-mcp"
+
+[environment]
+docker_image = "fred-bench"
+network_mode = "public"
+
+[agent]
+timeout_sec = 300
+
+[verifier]
+timeout_sec = 60

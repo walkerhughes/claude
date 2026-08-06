@@ -1,0 +1,16 @@
+[task]
+name = "fred-mcp/gdp-peak-unemployment"
+description = "Across the observations available for real GDP (GDPC1), find the date on which it was highest, then report the US unemployment rate (UNRATE) for that same date, as a percent."
+
+[metadata]
+suite = "fred-mcp"
+
+[environment]
+docker_image = "fred-bench"
+network_mode = "public"
+
+[agent]
+timeout_sec = 300
+
+[verifier]
+timeout_sec = 60

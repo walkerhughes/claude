@@ -1,12 +1,17 @@
 """get_revisions and get_release_calendar, through the registered MCP server."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from src import dates as dates_module
 
-from ..fixtures.fred_api import TODAY
+from ..fixtures.fred_api import FIXED_TODAY, NEXT_RELEASE_50_OFFSET, RELEASE_OFFSETS, TODAY
+
+
+def day(offset: int) -> str:
+    """A fixture release date, as the calendar will report it."""
+    return (FIXED_TODAY + timedelta(days=offset)).isoformat()
 
 pytestmark = pytest.mark.integration
 
@@ -101,8 +106,10 @@ class TestReleaseCalendar:
     async def test_splits_on_today(self, call):
         out = await call("get_release_calendar")
         assert out["today"] == TODAY
-        assert [r["date"] for r in out["released"]] == ["2026-08-01", "2026-08-05"]
-        assert [r["date"] for r in out["upcoming"]] == ["2026-08-07", "2026-08-12"]
+        # Offsets, not literals: the fixture generates release dates relative to the
+        # clock, so a hard-coded date would only be right for one day.
+        assert [r["date"] for r in out["released"]] == [day(-5), day(-2), day(0)]
+        assert [r["date"] for r in out["upcoming"]] == [day(9), day(12)]
 
     async def test_a_release_dated_today_counts_as_released(self, call):
         # It has come out; a model asking "what came out today" should see it.
@@ -142,7 +149,18 @@ class TestReleaseCalendar:
         out = await call("get_release_calendar", limit=1)
         assert len(out["released"]) == 1
         assert len(out["upcoming"]) == 1
-        assert out["totals"] == {"released": 2, "upcoming": 2}
+        assert out["totals"] == {"released": 3, "upcoming": 2}
+
+    async def test_the_next_release_for_one_publication(self, call):
+        # What `next-release` in the eval suite asks for, on the default window.
+        out = await call("get_release_calendar", release_id=50)
+        assert out["upcoming"][0]["date"] == day(NEXT_RELEASE_50_OFFSET)
+
+    async def test_a_wide_window_reaches_every_date_for_a_release(self, call):
+        # `end` takes absolute dates as well as spans. Spans only run backwards
+        # ("5y" is five years ago), so a forward window is written out in full.
+        out = await call("get_release_calendar", release_id=50, start="2020-01-01", end="2030-01-01")
+        assert len(out["released"]) + len(out["upcoming"]) == len(RELEASE_OFFSETS[50])
 
     async def test_release_id_narrows_to_one_publication_and_names_it(self, call, fred):
         out = await call("get_release_calendar", release_id=50)

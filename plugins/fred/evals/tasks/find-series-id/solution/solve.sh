@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Oracle: write the answer the fixtures imply, so the verifier itself can be checked.
+set -euo pipefail
+APP_DIR="${APP_DIR:-/app}"
+mkdir -p "$APP_DIR"
+cat > "$APP_DIR/answer.json" <<'JSON'
+{"series_id": "UNRATE"}
+JSON
