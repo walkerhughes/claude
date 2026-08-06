@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "fred": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/start-server.sh"],
+      "env": {
+        "FRED_API_KEY": "${FRED_API_KEY:-}",
+        "FRED_LOG_LEVEL": "${FRED_LOG_LEVEL:-}"
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+name: fred
+
+# GitHub Actions only reads workflows from the repository root, so every job here
+# sets working-directory to the plugin's subdirectory. The paths filters keep a
+# change to one plugin from running another's suite.
+on:
+  pull_request:
+    paths:
+      - "plugins/fred/**"
+      - ".github/workflows/fred.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/fred/**"
+      - ".github/workflows/fred.yml"
+
+defaults:
+  run:
+    working-directory: plugins/fred
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint & typecheck
+        run: make check
+
+      # No API key and no network: the integration suite drives a mock FRED app
+      # in-process over an injected httpx transport.
+      - name: Coverage (unit + integration)
+        run: make coverage
