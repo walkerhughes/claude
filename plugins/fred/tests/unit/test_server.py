@@ -1,10 +1,13 @@
 """The server builds and its manifest matches what ships."""
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
+from src.client import _KEY_PATTERN
 from src.server import INSTRUCTIONS, build_server, version
 
 pytestmark = pytest.mark.unit
@@ -32,6 +35,82 @@ EXPECTED_TOOLS: set[str] = {
 def test_instructions_name_the_entry_point():
     # A model that does not know to start with search_series will guess series IDs.
     assert "search_series" in INSTRUCTIONS
+
+
+class TestAuthCommand:
+    """The /fred:auth command and the script behind it.
+
+    The invariant worth pinning is that the command never collects the key itself. A
+    key pasted into the conversation is in the transcript and in the context window,
+    neither of which the user can rotate away, so the command delegates to a script
+    that prompts through the OS instead.
+    """
+
+    COMMAND = ROOT / "commands" / "auth.md"
+    SCRIPT = ROOT / "scripts" / "save-credentials.sh"
+
+    def test_the_command_exists_with_a_description(self):
+        text = self.COMMAND.read_text()
+        assert text.startswith("---")
+        front = text.split("---")[1]
+        assert "description:" in front
+        assert "~/.fred-mcp/credentials.json" in front
+
+    def test_the_command_runs_the_script_that_exists(self):
+        assert self.SCRIPT.exists()
+        assert os.access(self.SCRIPT, os.X_OK), "the helper must be executable"
+        assert "scripts/save-credentials.sh" in self.COMMAND.read_text()
+
+    def test_the_command_forbids_collecting_the_key_in_chat(self):
+        text = self.COMMAND.read_text().lower()
+        assert "do not ask the user to type or paste their api key" in text
+
+    def test_the_script_never_prints_the_key(self, tmp_path):
+        """Run the rejection path and confirm the key is nowhere in the output.
+
+        stdout is read by the agent, so a diagnostic that helpfully echoed what was
+        pasted would defeat the whole design. A malformed key is rejected locally, so
+        this needs no network.
+        """
+        secret = "THIS-IS-THE-SECRET-VALUE-NOT-A-KEY"
+        result = subprocess.run(
+            ["bash", str(self.SCRIPT)],
+            input=secret,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "FRED_CRED_DIR": str(tmp_path), "FRED_API_KEY_STDIN": "1"},
+        )
+        assert result.returncode == 1
+        assert secret not in result.stdout + result.stderr
+        assert not (tmp_path / "credentials.json").exists()
+
+    def test_no_echo_of_the_key_anywhere_in_the_script(self):
+        """The static half: the key reaches the file and nothing else."""
+        for line in self.SCRIPT.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "$key" not in stripped:
+                continue
+            if stripped.startswith(("echo", "printf")):
+                assert stripped.endswith('> "$CRED_FILE"'), f"key must not reach the terminal: {stripped}"
+
+    def test_the_script_validator_agrees_with_the_client(self):
+        """One rule for a well-formed key, checked in two places.
+
+        The script rejects a bad paste at the prompt; client.py rejects it at call
+        time. If they drifted apart, /fred:auth would happily save a key the server
+        then refuses.
+        """
+        assert "^[a-z0-9]{32}$" in self.SCRIPT.read_text()
+        assert _KEY_PATTERN.pattern == "^[a-z0-9]{32}$"
+
+    def test_the_script_selftest_passes(self):
+        result = subprocess.run(["bash", str(self.SCRIPT), "--selftest"], capture_output=True, text=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_writing_is_the_last_step_after_verification(self):
+        """A mistyped key during a rotation must not overwrite a working one."""
+        body = self.SCRIPT.read_text()
+        assert body.index("FRED rejected that key") < body.index('> "$CRED_FILE"')
 
 
 class TestPluginManifest:

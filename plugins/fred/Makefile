@@ -1,5 +1,5 @@
 .PHONY: lint lint-fix format typecheck check test test-unit test-integration coverage \
-        validate-tasks evals mock-api benchmark-build benchmark benchmark-view
+        validate-tasks evals mock-api benchmark-build benchmark benchmark-view selftest
 
 lint:
 	uv run ruff check .
@@ -13,7 +13,12 @@ format:
 typecheck:
 	uv run mypy src/
 
-check: lint typecheck test-unit
+check: lint typecheck selftest test-unit
+
+# The credential helper is shipped payload but lives outside src/, so pytest never
+# imports it. It carries its own assertions; this is what runs them.
+selftest:
+	bash scripts/save-credentials.sh --selftest
 
 test:
 	uv run pytest
