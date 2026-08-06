@@ -58,7 +58,11 @@ def gate(stats: dict, min_mean: float = 1.0, only: str | None = None) -> tuple[b
         return False, f"reward not perfect (mean={mean:.3f}, rewards={found})"
     if mean < min_mean:
         return False, f"mean reward {mean:.3f} below threshold {min_mean} (rewards={found})"
-    return True, f"mean reward {mean:.3f} over {n} trial(s), {len(found)} task(s)"
+    # `found` counts reward values, not tasks: harbor aggregates every trial into one
+    # mean per reward name, so a clean 10-task run reports two. Calling that "2 task(s)"
+    # reads like eight tasks went missing at exactly the moment someone is looking for
+    # a reason the gate failed.
+    return True, f"mean reward {mean:.3f} over {n} trial(s), {len(found)} reward(s)"
 
 
 def _selftest() -> None:
