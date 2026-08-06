@@ -24,6 +24,14 @@ def today() -> date:
     return date.today()
 
 
+def days_before(day: date, count: int) -> date:
+    return date.fromordinal(day.toordinal() - count)
+
+
+def days_after(day: date, count: int) -> date:
+    return date.fromordinal(day.toordinal() + count)
+
+
 def parse(value: str, *, field: str) -> str:
     """Return a YYYY-MM-DD string, or "" for an unset value.
 

@@ -113,6 +113,40 @@ DAILY_MIN, DAILY_MAX = 50.0, 300.0
 
 OBSERVATIONS = {"UNRATE": UNRATE_OBS, "GDPC1": GDPC1_OBS, "CPIAUCSL": UNRATE_OBS, "DGS10": DAILY_OBS}
 
+# What FRED returns for output_type=4: the value as first published, with the realtime
+# window showing when that print was current. GDPC1 gets revised, UNRATE does not.
+INITIAL_OBS = {
+    # 2025-01-01 was revised (22900 -> 23000); 2025-04-01 stands as first published.
+    # One of each, so "revised" counting is tested against a mix rather than a
+    # uniformly-revised series where an off-by-one would pass.
+    "GDPC1": [("2025-01-01", "22900.0"), ("2025-04-01", "23150.5")],
+    "UNRATE": UNRATE_OBS,
+    "CPIAUCSL": UNRATE_OBS,
+}
+
+# One column per vintage, the output_type=2 shape. Six vintages, one real revision:
+# the collapse should reduce this to two entries, not six.
+VINTAGE_ROW = {
+    "date": "2025-01-01",
+    "GDPC1_20250430": "22900.0",
+    "GDPC1_20250528": "22900.0",
+    "GDPC1_20250625": "22900.0",
+    "GDPC1_20250730": "23000.0",
+    "GDPC1_20250828": "23000.0",
+    "GDPC1_20250925": "23000.0",
+}
+
+VINTAGE_DATES = ["2025-09-25", "2025-08-28", "2025-07-30", "2025-06-25", "2025-05-28", "2025-04-30"]
+
+# Dates straddle TODAY so the released/upcoming split has something on both sides.
+TODAY = "2026-08-05"
+RELEASE_DATES = [
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2026-08-01"},
+    {"release_id": 10, "release_name": "Consumer Price Index", "date": "2026-08-05"},
+    {"release_id": 50, "release_name": "Employment Situation", "date": "2026-08-07"},
+    {"release_id": 10, "release_name": "Consumer Price Index", "date": "2026-08-12"},
+]
+
 
 class MockFred:
     """Routes FRED paths to captured payloads and records every request."""
@@ -141,6 +175,20 @@ class MockFred:
             return self._one_series(params.get("series_id", ""))
         if path.endswith("/series/observations"):
             return self._observations(params)
+        if path.endswith("/series/vintagedates"):
+            return _ok({"count": len(VINTAGE_DATES), "vintage_dates": VINTAGE_DATES[: int(params.get("limit", 100))]})
+        if path.endswith("/releases/dates"):
+            return self._release_dates(params, RELEASE_DATES)
+        if path.endswith("/release/dates"):
+            # FRED omits release_name here, unlike /releases/dates.
+            rows = [
+                {"release_id": r["release_id"], "date": r["date"]}
+                for r in RELEASE_DATES
+                if str(r["release_id"]) == params.get("release_id")
+            ]
+            return self._release_dates(params, rows)
+        if path.endswith("/fred/release"):
+            return _ok({"releases": [{"id": 50, "name": "Employment Situation", "link": "http://www.bls.gov/ces/"}]})
         if path.endswith("/series/search"):
             return self._series_list(params, [UNRATE, UNRATENSA, CPIAUCSL, GDPC1])
         if path.endswith("/release/series") or path.endswith("/category/series"):
@@ -190,24 +238,41 @@ class MockFred:
         if series_id not in OBSERVATIONS:
             return _error(400, "Bad Request.  The series does not exist.")
 
+        output_type = params.get("output_type", "1")
+        if output_type in ("2", "4"):
+            # FRED's own behaviour, and the reason get_revisions exists: without a
+            # real-time window spanning the record, a vintage request fails.
+            if params.get("realtime_start") != "1776-07-04":
+                return _error(
+                    400,
+                    "Bad Request.  No vintage dates exist for the specified real-time period: "
+                    f"{TODAY} to {TODAY}.",
+                )
+            if output_type == "2":
+                row = VINTAGE_ROW if params.get("observation_start") == VINTAGE_ROW["date"] else None
+                return _ok({"observations": [row] if row else []})
+            rows = INITIAL_OBS.get(series_id, [])
+            return self._observation_payload(_limited(rows, params), params)
+
         rows = OBSERVATIONS[series_id]
         start, end = params.get("observation_start"), params.get("observation_end")
         if start:
             rows = [r for r in rows if r[0] >= start]
         if end:
             rows = [r for r in rows if r[0] <= end]
+        return self._observation_payload(_limited(rows, params), params)
 
+    def _observation_payload(self, rows: list[tuple[str, str]], params: dict[str, str]) -> httpx.Response:
         # Real-time fields carry the same value on every row, which is the redundancy
         # the columnar shaping exists to remove; the fixture reproduces it faithfully.
         return _ok(
             {
-                "realtime_start": "2026-08-05",
-                "realtime_end": "2026-08-05",
+                "realtime_start": TODAY,
+                "realtime_end": TODAY,
                 "units": params.get("units", "lin"),
                 "count": len(rows),
                 "observations": [
-                    {"realtime_start": "2026-08-05", "realtime_end": "2026-08-05", "date": d, "value": v}
-                    for d, v in rows
+                    {"realtime_start": TODAY, "realtime_end": TODAY, "date": d, "value": v} for d, v in rows
                 ],
             }
         )
@@ -233,6 +298,28 @@ class MockFred:
         total = len(rows)
         limit = int(params.get("limit", 1000))
         return _ok({"count": total, "offset": 0, "limit": limit, "seriess": rows[:limit]})
+
+
+    def _release_dates(self, params: dict[str, str], pool: list[dict]) -> httpx.Response:
+        rows = list(pool)
+        start, end = params.get("realtime_start"), params.get("realtime_end")
+        if start:
+            rows = [r for r in rows if r["date"] >= start]
+        if end:
+            rows = [r for r in rows if r["date"] <= end]
+        # FRED only returns scheduled dates that have not produced data yet when this
+        # flag is set, so the fixture withholds them without it.
+        if params.get("include_release_dates_with_no_data") != "true":
+            rows = [r for r in rows if r["date"] <= TODAY]
+        return _ok({"count": len(rows), "release_dates": rows[: int(params.get("limit", 1000))]})
+
+
+def _limited(rows: list[tuple[str, str]], params: dict[str, str]) -> list[tuple[str, str]]:
+    """FRED's limit and sort_order, applied the way the real API does."""
+    if params.get("sort_order") == "desc":
+        rows = sorted(rows, reverse=True)
+    limit = int(params.get("limit", 100000))
+    return rows[:limit]
 
 
 def _tags_for(series: dict) -> set[str]:
