@@ -7,6 +7,11 @@
   },
   "plugins": [
     {
+      "name": "fred",
+      "source": "./plugins/fred",
+      "description": "Economic data from the St. Louis Fed's FRED API: search 800,000 series, pull several at once onto one date index with transformations like year-over-year applied server-side, see what a number was first reported as before revision, and check the release calendar."
+    },
+    {
       "name": "harbor-hub",
       "source": "./plugins/harbor-hub",
       "description": "Inspect Harbor hub evaluation jobs, trials, and uploads from Claude Code, and publish tasks, datasets, and job archives when writes are enabled."

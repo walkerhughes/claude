@@ -10,6 +10,7 @@ Formerly `walkerhughes/mcps`, back when it only held MCP servers.
 
 | Server | What it connects to | Plugin |
 |--------|---------------------|--------|
+| [`fred`](plugins/fred/) | The [FRED API](https://fred.stlouisfed.org/docs/api/fred/): the St. Louis Fed's economic time series, plus revision history and the release calendar (5 tools). | yes |
 | [`harbor-hub`](plugins/harbor-hub/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. | yes |
 | [`tastytrade`](plugins/tastytrade/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). | not yet |
 
@@ -55,6 +56,7 @@ MCP server plugins require [`uv`](https://docs.astral.sh/uv/) on your PATH. The 
 claude/
 ├── .claude-plugin/          # marketplace manifest
 └── plugins/
+    ├── fred/
     ├── harbor-hub/
     ├── persona/
     └── tastytrade/
