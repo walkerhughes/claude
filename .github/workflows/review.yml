@@ -1,0 +1,136 @@
+name: review
+
+# Comment `/review` on a PR to get a Claude review with line-anchored findings.
+#
+# On demand, never on push: a review that runs on every commit is noise and spends
+# a shared subscription rate-limit window on work in progress. It is advisory and
+# cannot be a required status check, because a PR nobody types `/review` on would
+# sit pending forever.
+#
+# `issue_comment` always runs the copy of this file on the default branch, so
+# unlike every other workflow here this one cannot be iterated on from a PR
+# branch. It does nothing until it is merged to main.
+#
+# Almost everything the review needs is already in anthropics/claude-code-action:
+# it resolves and checks out the PR head (issue_comment carries no pull_request
+# payload), requires repo write permission on the actor, posts a tracking comment
+# linking the run before the review starts, and exposes an MCP tool for inline
+# review comments. What is left is this file.
+on:
+  issue_comment:
+    types: [created]
+
+# A second `/review` supersedes the first rather than queueing behind it.
+#
+# ponytail: deliberately not joined to the eval gates' serialization group. They
+# draw on the same subscription account, so a review can collide with a gate run
+# and take a 429. A review is cheap and retryable; a merge gate stuck behind a
+# full eval suite is not. Give all three one shared group name if collisions
+# actually start happening.
+concurrency:
+  group: review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # PR comments only, and only ones that open with `/review`. The action does
+    # its own trigger-phrase match; this `if` is what keeps a runner from spinning
+    # up for every other comment on the repo.
+    #
+    # No author_association check here on purpose. The action requires repo write
+    # permission on the actor before it does anything, which is the same gate with
+    # a live permissions lookup instead of a payload field that a fork PR author
+    # can hold. A drive-by commenter gets a runner start and an immediate refusal.
+    if: >-
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # read the diff; never write to the head branch
+      pull-requests: write # post the review and its inline comments
+      issues: write # post the tracking comment
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same probe as tastytrade.yml. A setup-token credential is long-lived but
+      # not permanent, and a review job that silently no-ops on a revoked token is
+      # worse than one that fails loudly: the PR author reads silence as "Claude
+      # found nothing".
+      - name: Check the subscription token
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Mint one with 'claude setup-token' and add it as a repository secret."
+            exit 1
+          fi
+          status="$(curl -sS -o /tmp/auth-probe.json -w '%{http_code}' \
+            https://api.anthropic.com/v1/messages \
+            -H "Authorization: Bearer $CLAUDE_CODE_OAUTH_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: oauth-2025-04-20" \
+            -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')"
+          if [ "$status" = "401" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is expired or revoked. Mint a new one with 'claude setup-token' and update the repository secret."
+            exit 1
+          fi
+          if [ "$status" != "200" ]; then
+            echo "::error::Auth probe returned HTTP $status, expected 200. The review would likely fail after spending a rate-limit window; response body:"
+            cat /tmp/auth-probe.json
+            exit 1
+          fi
+          echo "Auth probe returned HTTP 200; proceeding."
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Subscription auth, same account as the eval gates. Never add
+          # anthropic_api_key alongside it: with both present the CLI silently
+          # prefers the key and the run is on credits again.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          trigger_phrase: "/review"
+
+          # The review lens comes from a plugin rather than a prompt buried in
+          # this file, so it can improve without editing CI.
+          #
+          # ponytail: unpinned. `claude plugin marketplace add` clones the default
+          # branch, so this job runs whatever is on ponytail's main at the time,
+          # with the subscription token in the environment. The read-only tool
+          # allowlist below is the mitigation. If that stops feeling like enough,
+          # vendor the review guidance as a skill in this repo instead.
+          plugin_marketplaces: https://github.com/DietrichGebert/ponytail.git
+          plugins: ponytail@ponytail
+
+          # ponytail-review only hunts over-engineering. The rest of what this
+          # repo actually gets wrong is not code smell, so it is spelled out here.
+          prompt: |
+            Review this PR. Run the ponytail-review skill for the over-engineering
+            pass, then check what is specific to this repo:
+
+            - MCP tool schemas: would the descriptions and parameter docs steer a
+              model toward valid calls, or does using the tool require knowledge
+              that is not in the schema?
+            - Skills: do the instructions match what the code actually does now, or
+              has the code moved and left the skill describing the old behavior?
+            - Eval tasks: was a task or verifier edited to fit a failing run rather
+              than to measure something? A verifier that got looser in the same
+              diff that changed the thing it verifies is the tell.
+
+            Leave line-anchored inline comments where a finding points at specific
+            lines. Findings only: no summary of what the PR does, no praise.
+            Nothing to say is a valid review.
+
+          # Read-only by construction. The head may be fork code, and unlike the
+          # `pull_request` gates this job runs in the base repo's context with the
+          # subscription token in the environment. So the review reads the diff and
+          # never builds, installs, or executes anything out of the checkout. `gh`
+          # is narrowed to two read subcommands rather than left open as Bash.
+          #
+          # ponytail: whole-PR diff every time, and repeated `/review` calls can
+          # repeat findings. cancel-in-progress covers the common case. Add
+          # since-last-review scoping and dedup against existing review comments
+          # when a re-review is actually expensive or the repeats get annoying.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Read,Glob,Grep,Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,WebFetch"
