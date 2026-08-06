@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from . import dates
+
 MAX_SERIES_PER_CALL = 20
 
 # FRED's frequency codes, and the words a model writes instead.
@@ -74,6 +76,45 @@ SERIES_ORDER_BY = {
 }
 
 SERIES_INCLUDES = ("metadata", "notes", "release", "categories", "tags")
+
+# What each FRED units code actually does, echoed in the response so the numbers are
+# not left to be guessed at.
+UNITS_MEANING: dict[str, str] = {
+    "lin": "levels, as published",
+    "chg": "change from the previous period",
+    "ch1": "change from a year ago",
+    "pch": "percent change from the previous period",
+    "pc1": "percent change from a year ago",
+    "pca": "compounded annual rate of change",
+    "cch": "continuously compounded rate of change",
+    "cca": "continuously compounded annual rate of change",
+    "log": "natural log",
+}
+
+# The single highest-value table in this file. "Year over year percent change" is the
+# most-asked transformation in all of economics and FRED spells it "pc1".
+UNITS_ALIASES: dict[str, str] = {
+    "": "lin", "lin": "lin", "level": "lin", "levels": "lin", "none": "lin",
+    "raw": "lin", "as published": "lin", "nominal": "lin",
+    "pc1": "pc1", "yoy": "pc1", "y/y": "pc1", "yoy%": "pc1", "year over year": "pc1",
+    "year-over-year": "pc1", "annual percent change": "pc1", "percent change from year ago": "pc1",
+    "percent change from a year ago": "pc1", "inflation": "pc1",
+    "pch": "pch", "mom": "pch", "m/m": "pch", "month over month": "pch",
+    "percent change": "pch", "pct change": "pch", "pct_change": "pch",
+    "percent change from previous period": "pch",
+    "chg": "chg", "change": "chg", "diff": "chg", "difference": "chg",
+    "change from previous period": "chg",
+    "ch1": "ch1", "change from year ago": "ch1", "change from a year ago": "ch1",
+    "pca": "pca", "annualized": "pca", "saar": "pca", "annual rate": "pca",
+    "compounded annual rate of change": "pca",
+    "cch": "cch", "cca": "cca", "log": "log", "natural log": "log", "ln": "log",
+}  # fmt: skip
+
+AGGREGATION_ALIASES: dict[str, str] = {
+    "avg": "avg", "average": "avg", "mean": "avg",
+    "sum": "sum", "total": "sum",
+    "eop": "eop", "end": "eop", "end of period": "eop", "last": "eop", "close": "eop",
+}  # fmt: skip
 
 
 def normalize_series_ids(value: Any) -> Any:
@@ -231,3 +272,72 @@ class GetSeriesArgs(BaseModel):
 
     def wants(self, part: str) -> bool:
         return part in self.include
+
+
+class ObservationArgs(BaseModel):
+    """Arguments for get_observations."""
+
+    series_ids: list[str] = Field(min_length=1, max_length=MAX_SERIES_PER_CALL)
+    start: str = ""
+    end: str = ""
+    units: str = "lin"
+    frequency: str = ""
+    aggregation_method: str = "avg"
+    # Floor of 2 because downsampling always keeps the first and last point; a cap of
+    # one cannot express a series.
+    max_points: int = Field(default=120, ge=2, le=2000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _correct(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if "series_ids" in data:
+            data["series_ids"] = normalize_series_ids(data["series_ids"])
+        for field in ("start", "end"):
+            if data.get(field) is not None:
+                data[field] = dates.parse(data[field], field=field)
+        if data.get("units") is not None:
+            raw = str(data["units"]).strip().lower()
+            data["units"] = UNITS_ALIASES.get(raw, raw)
+        if "frequency" in data:
+            data["frequency"] = normalize_frequency(data["frequency"])
+        if data.get("aggregation_method") is not None:
+            raw = str(data["aggregation_method"]).strip().lower()
+            data["aggregation_method"] = AGGREGATION_ALIASES.get(raw, raw)
+        return data
+
+    @field_validator("units")
+    @classmethod
+    def _known_units(cls, value: str) -> str:
+        if value not in UNITS_MEANING:
+            raise ValueError(
+                f"unknown units {value!r}; use a FRED code ({', '.join(UNITS_MEANING)}) "
+                "or a phrase such as 'yoy', 'percent change', 'level'"
+            )
+        return value
+
+    @field_validator("frequency")
+    @classmethod
+    def _known_frequency(cls, value: str) -> str:
+        if value and value not in FREQUENCY_TAGS:
+            raise ValueError(f"unknown frequency {value!r}; use one of {', '.join(FREQUENCY_TAGS)}")
+        return value
+
+    @field_validator("aggregation_method")
+    @classmethod
+    def _known_aggregation(cls, value: str) -> str:
+        if value not in ("avg", "sum", "eop"):
+            raise ValueError(f"unknown aggregation_method {value!r}; use avg, sum, or eop")
+        return value
+
+    @model_validator(mode="after")
+    def _range_is_the_right_way_round(self) -> "ObservationArgs":
+        if self.start and self.end and self.start > self.end:
+            raise ValueError(f"start ({self.start}) is after end ({self.end}); swap them")
+        return self
+
+    @property
+    def units_meaning(self) -> str:
+        return UNITS_MEANING[self.units]

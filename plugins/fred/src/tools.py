@@ -14,7 +14,7 @@ from mcp.server import MCPServer
 from . import shaping
 from .client import FredClient
 from .errors import guarded_tool
-from .schemas import GetSeriesArgs, SearchArgs
+from .schemas import GetSeriesArgs, ObservationArgs, SearchArgs
 
 _client: FredClient | None = None
 
@@ -40,6 +40,15 @@ def reset_state() -> None:
 def fmt(data: object) -> str:
     """Render a tool result as compact, stable JSON."""
     return json.dumps(data, indent=2, default=str)
+
+
+def _http_detail(exc: httpx.HTTPStatusError) -> str:
+    """FRED's own explanation, which the status code alone does not carry."""
+    try:
+        detail = str(exc.response.json().get("error_message", "")).strip()
+    except ValueError:
+        detail = ""
+    return " ".join(detail.split()) or f"HTTP {exc.response.status_code}"
 
 
 async def _search_series(args: SearchArgs) -> dict:
@@ -109,14 +118,9 @@ async def _fetch_one_series(args: GetSeriesArgs, series_id: str) -> dict:
             optional("tags", "/series/tags"),
         )
     except httpx.HTTPStatusError as exc:
-        detail = ""
-        try:
-            detail = str(exc.response.json().get("error_message", "")).strip()
-        except ValueError:
-            pass
         return {
             "id": series_id,
-            "error": " ".join(detail.split()) or f"HTTP {exc.response.status_code}",
+            "error": _http_detail(exc),
             "suggestion": "Check this ID with search_series; the others in this call were returned.",
         }
 
@@ -129,6 +133,67 @@ async def _fetch_one_series(args: GetSeriesArgs, series_id: str) -> dict:
     if tags is not None:
         out["tags"] = shaping.tag_names(tags.get("tags", []))
     return out
+
+
+Pairs = list[tuple[str, shaping.Number]]
+
+
+async def _observations_for(args: ObservationArgs, series_id: str) -> tuple[str, Pairs | str]:
+    """One series' observations, or its own error message. A bad ID among good ones
+    should cost only its own column, not the whole comparison."""
+    try:
+        payload = await get_client().get(
+            "/series/observations",
+            series_id=series_id,
+            observation_start=args.start,
+            observation_end=args.end,
+            units=args.units,
+            frequency=args.frequency,
+            # FRED ignores this unless frequency is set, so sending it always is safe.
+            aggregation_method=args.aggregation_method,
+            sort_order="asc",
+        )
+    except httpx.HTTPStatusError as exc:
+        return series_id, _http_detail(exc)
+    return series_id, shaping.observation_pairs(payload)
+
+
+async def _get_observations(args: ObservationArgs) -> dict:
+    fetched = await asyncio.gather(*(_observations_for(args, sid) for sid in args.series_ids))
+
+    per_series: dict[str, Pairs] = {}
+    errors: dict[str, str] = {}
+    for series_id, outcome in fetched:
+        if isinstance(outcome, str):
+            errors[series_id] = outcome
+        else:
+            per_series[series_id] = outcome
+
+    # Summaries first, over every observation. Downsampling after, so a thinned series
+    # still reports its true latest value and true extremes.
+    summary = {series_id: shaping.summarize(pairs) for series_id, pairs in per_series.items()}
+    dates, columns = shaping.align(per_series)
+    total = len(dates)
+    dates, columns, dropped = shaping.downsample(dates, columns, args.max_points)
+
+    points: dict[str, object] = {"returned": len(dates), "total": total, "dropped": dropped}
+    if dropped:
+        points["note"] = "evenly spaced sample; the summary covers every observation"
+
+    result: dict[str, object] = {
+        "units": args.units,
+        "units_meaning": args.units_meaning,
+        "dates": dates,
+        "values": columns,
+        "summary": summary,
+        "points": points,
+    }
+    if args.frequency:
+        result["frequency"] = args.frequency
+        result["aggregation_method"] = args.aggregation_method
+    if errors:
+        result["errors"] = errors
+    return result
 
 
 def register_all(mcp: MCPServer) -> None:
@@ -207,3 +272,51 @@ def register_all(mcp: MCPServer) -> None:
         args = GetSeriesArgs.model_validate({"series_ids": series_ids, "include": include or ["metadata"]})
         results = await asyncio.gather(*(_fetch_one_series(args, sid) for sid in args.series_ids))
         return fmt({"series": list(results)})
+
+    @mcp.tool()
+    @guarded_tool
+    async def get_observations(
+        series_ids: list[str] | str,
+        start: str = "",
+        end: str = "",
+        units: str = "lin",
+        frequency: str = "",
+        aggregation_method: str = "avg",
+        max_points: int = 120,
+    ) -> str:
+        """Get the actual numbers. Pass several series at once to compare them.
+
+        Series come back on one shared date index, so a comparison is a single call:
+        {"dates": [...], "values": {"UNRATE": [...], "CPIAUCSL": [...]}}. Where a
+        series has no observation for a date (a quarterly series against a monthly
+        one) the value is null rather than filled in.
+
+        start and end accept YYYY-MM-DD, a bare year ("2020"), a year-month
+        ("2020-01"), a span back from today ("5y", "18 months", "last 10 years"),
+        "ytd", or "today". Omit both for the full history.
+
+        units transforms the series server-side, so do not do this arithmetic
+        yourself. Say "yoy" for year-over-year percent change (FRED calls it pc1),
+        "percent change" for period-over-period, "change" for a difference,
+        "annualized", or "level" for the published numbers.
+
+        frequency aggregates to a coarser interval only ("monthly", "quarterly",
+        "annual"), with aggregation_method of avg, sum, or eop.
+
+        Every series gets a summary (latest, prior, change, min, max, mean, count)
+        computed over ALL its observations. Only the returned point list is thinned
+        to max_points, so a 20-year daily series still reports its true extremes
+        without spending 5,000 points to do it.
+        """
+        args = ObservationArgs.model_validate(
+            {
+                "series_ids": series_ids,
+                "start": start,
+                "end": end,
+                "units": units,
+                "frequency": frequency,
+                "aggregation_method": aggregation_method,
+                "max_points": max_points,
+            }
+        )
+        return fmt(await _get_observations(args))

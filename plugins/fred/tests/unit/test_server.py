@@ -20,7 +20,7 @@ async def test_server_builds_and_exposes_its_tools():
 
 # Grows with the stack in #30. Asserting the exact set is what catches a tool that was
 # written but never registered, which is otherwise invisible until a user asks for it.
-EXPECTED_TOOLS: set[str] = {"search_series", "get_series"}
+EXPECTED_TOOLS: set[str] = {"search_series", "get_series", "get_observations"}
 
 
 def test_instructions_name_the_entry_point():
