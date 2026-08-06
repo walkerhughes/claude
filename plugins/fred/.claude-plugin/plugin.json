@@ -1,6 +1,6 @@
 {
   "name": "fred",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for the FRED API: economic time series from the St. Louis Fed, with search, aligned multi-series observations, revision history, and the release calendar.",
   "author": {
     "name": "Walker Hughes"
