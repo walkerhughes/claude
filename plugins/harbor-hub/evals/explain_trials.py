@@ -91,9 +91,7 @@ def explain(job_dir: Path) -> None:
         rewards = _rewards(trial)
         if not rewards:
             continue
-        summary = ", ".join(
-            f"{name}={value}" for name, value in sorted(rewards.items())
-        )
+        summary = ", ".join(f"{name}={value}" for name, value in sorted(rewards.items()))
         print(f"\n== {trial.name}: {summary}")
 
         if rewards.get("process", 0.0) >= 1.0:
