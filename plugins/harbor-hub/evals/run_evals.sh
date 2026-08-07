@@ -124,11 +124,15 @@ run_args=(
     --ae EVAL_DELETE_JOB_ID="$DELETE_JOB_ID"
     --ae EVAL_TASK_REF="$EVAL_TASK_REF"
 )
-# Off by default, and off for PR runs: a job per push would pile up, and unlike
-# the seeds nothing drops these -- persisting them is the point. CI sets it on
-# pushes to main, so the hub keeps the reward/cost/token trend for the branch
-# that ships. Uploaded jobs are private by default; the trajectories contain
-# the eval instructions and the agent's full reasoning.
+# Off by default; CI sets it on every gate run, PR included, so the hub keeps
+# the reward/cost/token trend. This used to be pushes-only on the grounds that a
+# job per run piles up and nothing drops these. It piles up either way, and the
+# trade was the wrong way round: a PR gate that uploaded nothing left the CI
+# artifact, which expires in 7 days, as the only record of the run whose result
+# was actually in question. fred and tastytrade made the same call.
+#
+# Uploaded jobs are private by default; the trajectories contain the eval
+# instructions and the agent's full reasoning.
 if [ -n "${EVALS_UPLOAD:-}" ]; then
     echo "==> Results will be uploaded to the Harbor hub"
     run_args+=(--upload)
