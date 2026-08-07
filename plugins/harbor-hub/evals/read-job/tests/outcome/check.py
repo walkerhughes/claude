@@ -11,7 +11,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from rewardkit import criteria, criterion
+from rewardkit import criterion
 
 # One line, a plain decimal, nothing else -- no units, prose, or code fences.
 _DECIMAL = re.compile(r"^-?[0-9]+(\.[0-9]+)?$")
@@ -70,8 +70,3 @@ def answer_matches_hub_mean_reward(workspace: Path) -> bool:
     # well-formed answer, which returns above.
     truth = _hub_mean_reward(job_id)
     return abs(float(answer) - truth) <= 1e-6
-
-
-# Only file_exists is registered here -- a zero-arg @criterion self-registers
-# at decoration time, so calling it again would score it twice.
-criteria.file_exists("answer.txt")

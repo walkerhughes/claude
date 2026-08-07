@@ -11,7 +11,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from rewardkit import criteria, criterion
+from rewardkit import criterion
 
 
 def _answer(workspace: Path) -> str:
@@ -65,8 +65,3 @@ def job_gone_from_hub(workspace: Path) -> bool:
     # A deleted (or never-existent) job returns an empty object; a live job
     # carries a "stats" block. Treat empty/absent as gone.
     return not payload or not payload.get("stats")
-
-
-# Only file_exists is registered here -- a zero-arg @criterion self-registers
-# at decoration time, so calling it again would score it twice.
-criteria.file_exists("answer.txt")
