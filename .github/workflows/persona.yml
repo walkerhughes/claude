@@ -1,0 +1,82 @@
+name: persona
+
+# GitHub Actions only reads workflows from the repository root, so this job sets
+# working-directory to the plugin's subdirectory. The paths filters keep a change
+# to one plugin from running another's suite.
+#
+# persona ships no build and no dependencies: one stdlib-only script and a set of
+# markdown skills. So there is nothing to install here, and the checks are the two
+# ways this plugin can actually break.
+on:
+  pull_request:
+    paths:
+      - "plugins/persona/**"
+      - ".github/workflows/persona.yml"
+  push:
+    branches: [main]
+    paths:
+      - "plugins/persona/**"
+      - ".github/workflows/persona.yml"
+
+defaults:
+  run:
+    working-directory: plugins/persona
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The script already ships its own check, so CI runs that rather than
+      # growing a second, parallel notion of what "working" means. It imports and
+      # executes the whole file, so a syntax error fails here too.
+      - name: Self-test
+        run: python3 scripts/persona.py --selftest
+
+      # Claude Code discovers a skill by its frontmatter. A malformed block does
+      # not raise: the skill silently never loads and never triggers, which is the
+      # same invisible failure the plugin-version gate exists to prevent.
+      #
+      # ponytail: substring checks, not a YAML parse. PyYAML is not stdlib and the
+      # frontmatter here is flat key/value. Parse properly if it ever nests.
+      - name: Validate skill and command frontmatter
+        run: |
+          set -euo pipefail
+          status=0
+
+          # Globbed rather than listed, so a newly added skill is covered without
+          # editing this workflow.
+          shopt -s nullglob
+          for doc in skills/*/SKILL.md commands/*.md; do
+            # A skill declares its own name; a command takes its name from the
+            # filename, so requiring one there would fail every valid command.
+            case "$doc" in
+              skills/*) required="name description" ;;
+              *)        required="description" ;;
+            esac
+
+            if [ "$(head -n 1 "$doc")" != "---" ]; then
+              echo "::error file=plugins/persona/$doc::No opening --- frontmatter delimiter."
+              status=1
+              continue
+            fi
+
+            # Line number of the closing delimiter, searching past the opener.
+            close="$(tail -n +2 "$doc" | grep -n -m 1 '^---$' | cut -d: -f1 || true)"
+            if [ -z "$close" ]; then
+              echo "::error file=plugins/persona/$doc::Frontmatter is never closed by a --- delimiter."
+              status=1
+              continue
+            fi
+
+            block="$(tail -n +2 "$doc" | head -n "$((close - 1))")"
+            for field in $required; do
+              if ! printf '%s\n' "$block" | grep -q "^$field: *[^ ]"; then
+                echo "::error file=plugins/persona/$doc::Frontmatter has no non-empty '$field:' field."
+                status=1
+              fi
+            done
+          done
+
+          exit "$status"
