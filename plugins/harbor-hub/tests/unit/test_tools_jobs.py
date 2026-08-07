@@ -145,9 +145,7 @@ def fake_upload_db(monkeypatch) -> SimpleNamespace:
 
 
 async def test_whoami_happy(monkeypatch):
-    monkeypatch.setattr(
-        jobs, "resolve_api_key", lambda: ("sk-harbor-abc123_supersecret", "env")
-    )
+    monkeypatch.setattr(jobs, "resolve_api_key", lambda: ("sk-harbor-abc123_supersecret", "env"))
     monkeypatch.setattr(jobs, "require_user_id", AsyncMock(return_value="user-1"))
 
     raw = await jobs.whoami()
@@ -163,9 +161,7 @@ async def test_whoami_happy(monkeypatch):
 
 async def test_whoami_not_authenticated(monkeypatch):
     monkeypatch.setattr(jobs, "resolve_api_key", lambda: None)
-    monkeypatch.setattr(
-        jobs, "require_user_id", AsyncMock(side_effect=NotAuthenticatedError())
-    )
+    monkeypatch.setattr(jobs, "require_user_id", AsyncMock(side_effect=NotAuthenticatedError()))
 
     payload = json.loads(await jobs.whoami())
     assert "Not authenticated" in payload["error"]
@@ -173,9 +169,7 @@ async def test_whoami_not_authenticated(monkeypatch):
 
 
 async def test_list_jobs_happy(fake_hub):
-    fake_hub.list_jobs.return_value = make_page(
-        [make_job()], page_size=20, total=1, total_pages=1
-    )
+    fake_hub.list_jobs.return_value = make_page([make_job()], page_size=20, total=1, total_pages=1)
 
     payload = json.loads(await jobs.list_jobs())
     fake_hub.list_jobs.assert_awaited_once_with(page=1, page_size=20, search=None)
@@ -243,9 +237,7 @@ async def test_get_job_trials_happy(fake_hub):
     fake_hub.get_job_trials.return_value = make_page([make_trial(), failed])
 
     payload = json.loads(await jobs.get_job_trials("job-1", failed_only=True))
-    fake_hub.get_job_trials.assert_awaited_once_with(
-        ["job-1"], page=1, page_size=50, failed_only=True
-    )
+    fake_hub.get_job_trials.assert_awaited_once_with(["job-1"], page=1, page_size=50, failed_only=True)
     assert payload["total"] == 2
     first, second = payload["trials"]
     assert first == {
@@ -351,8 +343,7 @@ async def test_check_job_upload_invalid_uuid(fake_upload_db):
 async def test_check_job_upload_truncates_missing_archives(fake_upload_db):
     fake_upload_db.get_job.return_value = {"id": JOB_UUID, "job_name": "big"}
     fake_upload_db.list_trials_for_job.return_value = [
-        {"id": f"t{i}", "trial_name": f"trial-{i}", "archive_path": None}
-        for i in range(30)
+        {"id": f"t{i}", "trial_name": f"trial-{i}", "archive_path": None} for i in range(30)
     ]
 
     payload = json.loads(await jobs.check_job_upload(JOB_UUID))

@@ -85,9 +85,7 @@ def _parse_job_id(job_id: str) -> uuid.UUID | None:
 def _invalid_job_id(job_id: str) -> str:
     return error_response(
         f"Invalid job_id {job_id!r}: not a UUID.",
-        suggestions=[
-            "Pass the job's UUID, e.g. from list_jobs or the id printed by harbor run."
-        ],
+        suggestions=["Pass the job's UUID, e.g. from list_jobs or the id printed by harbor run."],
     )
 
 
@@ -127,9 +125,7 @@ async def upload_job(job_dir: str, visibility: str | None = None) -> str:
 
 
 @guarded_tool
-async def publish_task(
-    task_dir: str, visibility: str = "private", tags: str | None = None
-) -> str:
+async def publish_task(task_dir: str, visibility: str = "private", tags: str | None = None) -> str:
     """Publish a local task directory (task.toml + environment) to the hub registry.
 
     visibility: "public" or "private" (default private).
@@ -140,16 +136,12 @@ async def publish_task(
     if visibility not in _VISIBILITIES:
         return _invalid_visibility(visibility)
     tag_set = set(_split_csv(tags)) or None
-    result = await _publisher().publish_task(
-        Path(task_dir), tags=tag_set, visibility=visibility
-    )
+    result = await _publisher().publish_task(Path(task_dir), tags=tag_set, visibility=visibility)
     return fmt(result.model_dump(exclude={"archive_path", "rpc_time_sec"}))
 
 
 @guarded_tool
-async def publish_dataset(
-    dataset_dir: str, visibility: str = "private", tags: str | None = None
-) -> str:
+async def publish_dataset(dataset_dir: str, visibility: str = "private", tags: str | None = None) -> str:
     """Publish a local dataset directory (dataset.toml) to the hub registry.
 
     visibility: "public" or "private" (default private).
@@ -160,9 +152,7 @@ async def publish_dataset(
     if visibility not in _VISIBILITIES:
         return _invalid_visibility(visibility)
     tag_set = set(_split_csv(tags)) or None
-    result = await _publisher().publish_dataset(
-        Path(dataset_dir), tags=tag_set, visibility=visibility
-    )
+    result = await _publisher().publish_dataset(Path(dataset_dir), tags=tag_set, visibility=visibility)
     return fmt(result.model_dump(exclude={"rpc_time_sec"}))
 
 
@@ -177,9 +167,7 @@ async def download_job(job_id: str, dest_dir: str, overwrite: bool = False) -> s
     parsed = _parse_job_id(job_id)
     if parsed is None:
         return _invalid_job_id(job_id)
-    result = await _downloader().download_job(
-        parsed, Path(dest_dir), overwrite=overwrite
-    )
+    result = await _downloader().download_job(parsed, Path(dest_dir), overwrite=overwrite)
     return fmt(result.model_dump(exclude={"manifest_path"}))
 
 
@@ -197,9 +185,7 @@ async def set_job_visibility(job_id: str, visibility: str) -> str:
     job = await db.get_job(parsed)
     if job is None:
         return _job_not_found(job_id)
-    await db.update_job_visibility(
-        parsed, cast(Literal["public", "private"], visibility)
-    )
+    await db.update_job_visibility(parsed, cast(Literal["public", "private"], visibility))
     return fmt(
         {
             "job_id": str(parsed),
@@ -211,9 +197,7 @@ async def set_job_visibility(job_id: str, visibility: str) -> str:
 
 
 @guarded_tool
-async def share_job(
-    job_id: str, org_names: str | None = None, usernames: str | None = None
-) -> str:
+async def share_job(job_id: str, org_names: str | None = None, usernames: str | None = None) -> str:
     """Share a hub job with organizations and/or users (comma-separated names).
 
     Sharing grants read access without making the job public. The response
@@ -229,9 +213,7 @@ async def share_job(
     if not orgs and not users:
         return error_response(
             "Nothing to share: pass org_names and/or usernames.",
-            suggestions=[
-                'Pass comma-separated names, e.g. org_names="my-org" or usernames="alice,bob".'
-            ],
+            suggestions=['Pass comma-separated names, e.g. org_names="my-org" or usernames="alice,bob".'],
         )
     db = _upload_db()
     job = await db.get_job(parsed)
@@ -266,8 +248,7 @@ async def delete_job(job_id: str, confirm: bool = False) -> str:
         return disabled
     if not confirm:
         return error_response(
-            "delete_job requires confirm=true. Deletion is permanent and cannot "
-            "be undone.",
+            "delete_job requires confirm=true. Deletion is permanent and cannot be undone.",
             suggestions=[
                 f"Ask the user to explicitly approve deleting job {job_id}, then "
                 "call delete_job again with confirm=true."

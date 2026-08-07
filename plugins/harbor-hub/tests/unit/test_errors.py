@@ -59,9 +59,7 @@ async def test_guarded_tool_maps_postgrest_error():
     assert payload["suggestions"]
 
 
-@pytest.mark.parametrize(
-    "exc", [ValueError("bad ref"), FileNotFoundError("task.toml not found")]
-)
+@pytest.mark.parametrize("exc", [ValueError("bad ref"), FileNotFoundError("task.toml not found")])
 async def test_guarded_tool_maps_domain_errors_to_message(exc):
     @guarded_tool
     async def tool() -> str:

@@ -44,6 +44,4 @@ def test_mcp_excludes_2_0_which_removed_fastmcp() -> None:
 def test_harbor_is_pinned_exactly() -> None:
     """We import harbor internals, so a floating range is a live grenade."""
     specifier = _requirement("harbor").specifier
-    assert [s.operator for s in specifier] == ["=="], (
-        f"harbor must be pinned exactly, got {specifier}"
-    )
+    assert [s.operator for s in specifier] == ["=="], f"harbor must be pinned exactly, got {specifier}"

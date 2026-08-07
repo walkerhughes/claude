@@ -14,9 +14,7 @@ from mcp.client.stdio import stdio_client
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.skipif(
-        not os.environ.get("HARBOR_API_KEY"), reason="needs HARBOR_API_KEY"
-    ),
+    pytest.mark.skipif(not os.environ.get("HARBOR_API_KEY"), reason="needs HARBOR_API_KEY"),
 ]
 
 READ_TOOLS = {
@@ -68,9 +66,7 @@ async def test_lists_all_tools_with_schemas():
         assert {t.name for t in tools} == READ_TOOLS | WRITE_TOOLS
         for t in tools:
             assert t.description, f"{t.name} has no description"
-            assert t.inputSchema.get("type") == "object", (
-                f"{t.name} has no input schema"
-            )
+            assert t.inputSchema.get("type") == "object", f"{t.name} has no input schema"
 
 
 async def test_whoami_returns_user_id():

@@ -20,9 +20,7 @@ from mcp.client.stdio import stdio_client
 
 pytestmark = [
     pytest.mark.e2e,
-    pytest.mark.skipif(
-        not os.environ.get("HARBOR_API_KEY"), reason="needs HARBOR_API_KEY"
-    ),
+    pytest.mark.skipif(not os.environ.get("HARBOR_API_KEY"), reason="needs HARBOR_API_KEY"),
 ]
 
 # Shared fixture (also backs the eval runners' job bootstrap); see its README.
@@ -79,9 +77,7 @@ def job_dir(tmp_path_factory) -> Path:
 async def open_session():
     env = dict(os.environ)
     env["HARBOR_MCP_ENABLE_WRITES"] = "true"
-    params = StdioServerParameters(
-        command=sys.executable, args=["-m", "harbor_mcp.server"], env=env
-    )
+    params = StdioServerParameters(command=sys.executable, args=["-m", "harbor_mcp.server"], env=env)
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as s:
             await s.initialize()
@@ -119,9 +115,7 @@ async def test_upload_verify_download_delete_roundtrip(job_dir, tmp_path):
         assert detail
 
         # Round-trip the artifacts back to disk.
-        dl = await call(
-            session, "download_job", job_id=job_id, dest_dir=str(tmp_path / "dl")
-        )
+        dl = await call(session, "download_job", job_id=job_id, dest_dir=str(tmp_path / "dl"))
         downloaded = Path(dl["output_dir"])
         assert (downloaded / "result.json").exists()
 

@@ -34,9 +34,7 @@ async def test_check_task_published_happy(fake_registry_db):
     )
 
     payload = json.loads(await registry.check_task_published("acme", "hello-world"))
-    fake_registry_db.resolve_task_version.assert_awaited_once_with(
-        "acme", "hello-world", "latest"
-    )
+    fake_registry_db.resolve_task_version.assert_awaited_once_with("acme", "hello-world", "latest")
     assert payload == {
         "published": True,
         "org": "acme",
@@ -49,9 +47,7 @@ async def test_check_task_published_happy(fake_registry_db):
 
 
 async def test_check_task_published_not_published(fake_registry_db):
-    fake_registry_db.resolve_task_version.side_effect = ValueError(
-        "Task version not found: acme/missing@latest"
-    )
+    fake_registry_db.resolve_task_version.side_effect = ValueError("Task version not found: acme/missing@latest")
 
     payload = json.loads(await registry.check_task_published("acme", "missing"))
     assert payload["published"] is False
@@ -73,9 +69,7 @@ async def test_resolve_dataset_happy(fake_registry_db):
     ]
 
     payload = json.loads(await registry.resolve_dataset("acme", "terminal-bench"))
-    fake_registry_db.resolve_dataset_version.assert_awaited_once_with(
-        "acme", "terminal-bench", "latest"
-    )
+    fake_registry_db.resolve_dataset_version.assert_awaited_once_with("acme", "terminal-bench", "latest")
     fake_registry_db.get_dataset_version_tasks.assert_awaited_once_with("dv-1")
     assert payload["org"] == "acme"
     assert payload["name"] == "terminal-bench"

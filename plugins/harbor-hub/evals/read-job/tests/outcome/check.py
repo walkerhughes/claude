@@ -51,9 +51,7 @@ def _hub_mean_reward(job_id: str) -> float:
     try:
         return float((json.loads(proc.stdout).get("stats") or {})["avg_reward"])
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
-        raise RuntimeError(
-            f"could not read a mean reward for job {job_id!r} from the hub: {exc}"
-        ) from exc
+        raise RuntimeError(f"could not read a mean reward for job {job_id!r} from the hub: {exc}") from exc
 
 
 @criterion(description="answer.txt matches the hub's mean reward for the job")

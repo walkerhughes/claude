@@ -22,14 +22,11 @@ AUTH_SUGGESTIONS = [
     "them in ~/.harbor/credentials.json.",
     "If it reports a logged-in user, the stored key is revoked or expired: ask "
     "the user to run `harbor auth logout` and then `harbor auth login` again.",
-    "The server must be restarted to pick up new credentials. Then call whoami "
-    "to confirm.",
+    "The server must be restarted to pick up new credentials. Then call whoami to confirm.",
 ]
 
 
-def error_response(
-    message: str, suggestions: list[str] | None = None, **extra: Any
-) -> str:
+def error_response(message: str, suggestions: list[str] | None = None, **extra: Any) -> str:
     payload: dict[str, Any] = {"error": message}
     if suggestions:
         payload["suggestions"] = suggestions
@@ -61,9 +58,7 @@ def guarded_tool(func: Callable[..., Awaitable[str]]) -> Callable[..., Awaitable
             logger.debug("storage error in %s", func.__name__, exc_info=True)
             return error_response(
                 f"Harbor hub storage operation failed: {exc.message}",
-                suggestions=[
-                    "Retry once; if it persists, verify the archive exists via check_job_upload."
-                ],
+                suggestions=["Retry once; if it persists, verify the archive exists via check_job_upload."],
                 status=exc.status,
             )
         except (ValueError, FileNotFoundError, RuntimeError, PermissionError) as exc:

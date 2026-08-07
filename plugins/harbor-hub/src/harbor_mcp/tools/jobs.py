@@ -36,8 +36,7 @@ def _parse_uuid(value: str, param: str) -> uuid.UUID:
         return uuid.UUID(value)
     except (AttributeError, TypeError, ValueError):
         raise ValueError(
-            f"{param} must be a UUID, got {value!r}. "
-            "Use list_jobs or get_job_trials to find valid ids."
+            f"{param} must be a UUID, got {value!r}. Use list_jobs or get_job_trials to find valid ids."
         ) from None
 
 
@@ -109,9 +108,7 @@ async def list_jobs(page: int = 1, page_size: int = 20, search: str = "") -> str
     filter. Use this when you do NOT already have a job id; when you do, go
     straight to get_job_overview rather than searching for the job here. Pass
     a returned id to get_job_overview, get_job_trials, or check_job_upload."""
-    result = await _hub().list_jobs(
-        page=page, page_size=page_size, search=search.strip() or None
-    )
+    result = await _hub().list_jobs(page=page, page_size=page_size, search=search.strip() or None)
     rows, note = truncate([_job_row(job) for job in result.items], JOB_ROWS_CAP)
     return fmt(
         compact(
@@ -146,9 +143,7 @@ async def get_job_overview(job_id: str) -> str:
             f"Job not found or not accessible: {job_id}",
             suggestions=["Use list_jobs to find jobs visible to your account."],
         )
-    name = (header or {}).get("job_name") or (
-        overview.jobs[0].name if overview.jobs else None
-    )
+    name = (header or {}).get("job_name") or (overview.jobs[0].name if overview.jobs else None)
     return fmt(
         compact(
             {
@@ -172,9 +167,7 @@ async def get_job_overview(job_id: str) -> str:
 
 
 @guarded_tool
-async def get_job_trials(
-    job_id: str, page: int = 1, page_size: int = 50, failed_only: bool = False
-) -> str:
+async def get_job_trials(job_id: str, page: int = 1, page_size: int = 50, failed_only: bool = False) -> str:
     """List a hub job's trials (latest attempt per trial) with task, status,
     reward, error, cost, and duration.
 
@@ -184,9 +177,7 @@ async def get_job_trials(
     failed_only=True to see only errored trials. Get job ids from list_jobs;
     pass a returned trial id to get_trial_detail for one trial's full
     record."""
-    result = await _hub().get_job_trials(
-        [job_id], page=page, page_size=page_size, failed_only=failed_only
-    )
+    result = await _hub().get_job_trials([job_id], page=page, page_size=page_size, failed_only=failed_only)
     rows, note = truncate([_trial_row(t) for t in result.items], TRIAL_ROWS_CAP)
     if result.total == 0:
         note = "no trials returned; verify the job id via list_jobs or check_job_upload"
@@ -252,19 +243,12 @@ async def check_job_upload(job_id: str) -> str:
             {
                 "exists": False,
                 "job_id": job_id,
-                "note": (
-                    "job not found or not accessible; rows hidden by "
-                    "permissions look identical to missing rows"
-                ),
+                "note": ("job not found or not accessible; rows hidden by permissions look identical to missing rows"),
             }
         )
     trials = await db.list_trials_for_job(parsed)
     status_counts = Counter(str(t.get("status") or "unknown") for t in trials)
-    missing = [
-        t.get("trial_name") or str(t.get("id"))
-        for t in trials
-        if not t.get("archive_path")
-    ]
+    missing = [t.get("trial_name") or str(t.get("id")) for t in trials if not t.get("archive_path")]
     missing_sample, note = truncate(missing, MISSING_ARCHIVE_SAMPLE_CAP)
     return fmt(
         compact(

@@ -55,7 +55,13 @@ class TestSeriesList:
 
 class TestOtherTrims:
     def test_release(self):
-        raw = {"id": 50, "name": "Employment Situation", "link": "http://x", "press_release": True, "realtime_start": "x"}  # noqa: E501
+        raw = {
+            "id": 50,
+            "name": "Employment Situation",
+            "link": "http://x",
+            "press_release": True,
+            "realtime_start": "x",
+        }  # noqa: E501
         assert shaping.trim_release(raw) == {
             "id": 50,
             "name": "Employment Situation",

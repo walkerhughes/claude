@@ -136,8 +136,7 @@ NUMERIC_TASKS = [
 STRING_TASKS = [
     (
         "series-units",
-        "What are the units of the real GDP series GDPC1? Report the full units description "
-        "exactly as FRED gives it.",
+        "What are the units of the real GDP series GDPC1? Report the full units description exactly as FRED gives it.",
         "units",
         _gdp_units(),
     ),
