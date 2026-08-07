@@ -7,6 +7,12 @@ These rules are derived from what the existing plugins already do. When they
 disagree, the majority of the three MCP plugins wins, and the divergence is
 listed under [Known drift](#known-drift) rather than left implicit.
 
+Each plugin has its own `CLAUDE.md` with the upstream docs worth reading and the
+things true only of that plugin. Read it before working in one:
+[fred](plugins/fred/CLAUDE.md), [harbor-hub](plugins/harbor-hub/CLAUDE.md),
+[persona](plugins/persona/CLAUDE.md),
+[tastytrade](plugins/tastytrade/CLAUDE.md).
+
 ## Layout
 
 ```
