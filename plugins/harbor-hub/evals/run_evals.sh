@@ -139,8 +139,11 @@ harbor run "${run_args[@]}"
 # harbor run exits 0 regardless of reward; gate on a perfect result so CI
 # (and `make evals`) fails the moment any eval regresses.
 if ! python3 "$REPO_ROOT/evals/check_reward.py" "$JOBS_DIR/$JOB_NAME/result.json" "$JOB_NAME"; then
-    echo "--- verifier output ---" >&2
-    cat "$JOBS_DIR/$JOB_NAME"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+    # Names each trial with its rewards, and the tool calls behind any that lost
+    # `process`. Cat-ing the verifier output instead gave one anonymous pair of
+    # numbers per eval, so learning which eval broke meant downloading the CI
+    # artifact, which expires after 7 days.
+    python3 "$REPO_ROOT/evals/explain_trials.py" "$JOBS_DIR/$JOB_NAME" >&2 || true
     die "the evals did not all reach reward 1.0"
 fi
 

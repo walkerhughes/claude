@@ -83,8 +83,10 @@ run_all() {
 
 show_verifier_output() {
     local agent=$1
-    echo "--- $agent verifier output ---" >&2
-    cat "$JOBS_DIR/$agent/safety-$agent"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+    # Names each eval with its rewards rather than printing one anonymous pair
+    # of numbers per eval, which said an eval broke but never which one.
+    echo "--- $agent trials ---" >&2
+    python3 "$REPO_ROOT/evals/explain_trials.py" "$JOBS_DIR/$agent/safety-$agent" >&2 || true
 }
 
 # The oracle must solve every eval: the evals are solvable. Outcome only --
