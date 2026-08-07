@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from rewardkit import criteria, criterion
+from rewardkit import criterion
 
 
 def _answer(workspace: Path) -> str:
@@ -61,10 +61,3 @@ def answer_matches_published_truth(workspace: Path) -> bool:
         )
 
     return answer == ("yes" if published else "no")
-
-
-# Only file_exists is registered here. A @criterion that takes nothing but
-# `workspace` self-registers at decoration time (rewardkit session.py: `if not
-# factory_params and not shared: factory()`), so calling it again would score
-# it twice.
-criteria.file_exists("answer.txt")
