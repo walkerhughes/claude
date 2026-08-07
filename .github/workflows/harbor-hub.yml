@@ -29,6 +29,11 @@ jobs:
       - run: uv sync --dev
       - run: make lint
       - run: make test
+      # Scores the process criteria against synthetic bypass and delegation
+      # runs. Lives here rather than in `evals` because it needs no hub, no
+      # Docker, and no model, so it can fail a PR in seconds instead of after
+      # the gate has spent a rate-limit window.
+      - run: make validate-process
 
   integration:
     # Deterministic tool-use tests: the test process invokes the MCP tools

@@ -1,4 +1,4 @@
-.PHONY: test test-integration test-e2e evals eval-safety lint
+.PHONY: test test-integration test-e2e evals eval-safety validate-process lint
 
 test:
 	uv run pytest tests/unit
@@ -14,6 +14,11 @@ evals:
 
 eval-safety:
 	./evals/run_eval_safety.sh
+
+# Scores the process criteria against synthetic bypass and delegation runs.
+# No hub, no Docker, no model -- unlike eval-safety, which needs all three.
+validate-process:
+	python3 ./evals/validate_process_local.py
 
 lint:
 	uv run ruff check . && uv run ruff format --check .
