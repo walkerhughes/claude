@@ -1,4 +1,4 @@
-.PHONY: test test-integration test-e2e evals eval-safety validate-process lint
+.PHONY: test test-integration test-e2e evals eval-safety validate-process lint format
 
 test:
 	uv run pytest tests/unit
@@ -22,3 +22,6 @@ validate-process:
 
 lint:
 	uv run ruff check . && uv run ruff format --check .
+
+format:
+	uv run ruff format .

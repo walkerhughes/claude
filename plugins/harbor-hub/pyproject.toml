@@ -52,11 +52,9 @@ markers = [
 addopts = ["-v", "--tb=short", "--strict-markers", "--strict-config", "-m", "not integration and not e2e"]
 
 [tool.ruff]
+extend = "../../ruff.toml"
 target-version = "py312"
 src = ["src"]
-
-[tool.ruff.lint]
-extend-select = ["I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["harbor_mcp"]

@@ -37,11 +37,8 @@ markers = [
 addopts = "-v"
 
 [tool.ruff]
-line-length = 120
+extend = "../../ruff.toml"
 target-version = "py313"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "W"]
 
 [tool.coverage.run]
 source = ["src"]

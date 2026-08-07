@@ -48,11 +48,7 @@ def _trajectory_calls() -> list:
         data = json.loads(TRAJECTORY.read_text())
     except (OSError, json.JSONDecodeError):
         return []
-    return [
-        call
-        for step in data.get("steps") or []
-        for call in step.get("tool_calls") or []
-    ]
+    return [call for step in data.get("steps") or [] for call in step.get("tool_calls") or []]
 
 
 def _session_calls() -> list:

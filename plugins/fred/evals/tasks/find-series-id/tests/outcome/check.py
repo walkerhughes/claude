@@ -11,7 +11,7 @@ from pathlib import Path
 from rewardkit import criterion
 
 KEY = "series_id"
-EXPECTED = 'UNRATE'
+EXPECTED = "UNRATE"
 
 
 def _normal(value: object) -> str:

@@ -13,6 +13,7 @@ def day(offset: int) -> str:
     """A fixture release date, as the calendar will report it."""
     return (FIXED_TODAY + timedelta(days=offset)).isoformat()
 
+
 pytestmark = pytest.mark.integration
 
 

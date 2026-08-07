@@ -1,7 +1,7 @@
 .PHONY: lint lint-fix format typecheck check selftest evals test test-unit test-integration coverage install-hooks validate-tasks mock-api benchmark-build benchmark benchmark-view
 
 lint:
-	uv run ruff check .
+	uv run ruff check . && uv run ruff format --check .
 
 lint-fix:
 	uv run ruff check . --fix

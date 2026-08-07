@@ -302,9 +302,7 @@ async def _release_calendar(args: CalendarArgs) -> dict:
     tomorrow = dates.days_after(dates.today(), 1).isoformat()
 
     past = _fetch_release_dates(args, args.start, min(args.end, today), future=False) if args.start <= today else None
-    ahead = (
-        _fetch_release_dates(args, max(args.start, tomorrow), args.end, future=True) if args.end > today else None
-    )
+    ahead = _fetch_release_dates(args, max(args.start, tomorrow), args.end, future=True) if args.end > today else None
     release = get_client().get("/release", release_id=args.release_id) if args.release_id is not None else None
 
     pending = [task for task in (past, ahead, release) if task is not None]

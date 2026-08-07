@@ -11,7 +11,7 @@ from pathlib import Path
 from rewardkit import criterion
 
 KEY = "units"
-EXPECTED = 'Billions of Chained 2017 Dollars'
+EXPECTED = "Billions of Chained 2017 Dollars"
 
 
 def _normal(value: object) -> str:

@@ -64,15 +64,9 @@ def _write_scratch_task(root: Path, org: str) -> Path:
             mcp_servers = []
             """)
     )
-    (root / "instruction.md").write_text(
-        "Scratch task for harbor-mcp integration tests.\n"
-    )
-    (root / "environment" / "Dockerfile").write_text(
-        "FROM python:3.12-slim\n\nWORKDIR /app\n"
-    )
-    (root / "tests" / "test.sh").write_text(
-        "#!/bin/bash\necho 1 > /logs/verifier/reward.txt\n"
-    )
+    (root / "instruction.md").write_text("Scratch task for harbor-mcp integration tests.\n")
+    (root / "environment" / "Dockerfile").write_text("FROM python:3.12-slim\n\nWORKDIR /app\n")
+    (root / "tests" / "test.sh").write_text("#!/bin/bash\necho 1 > /logs/verifier/reward.txt\n")
     return root
 
 
@@ -82,9 +76,7 @@ def _write_scratch_task(root: Path, org: str) -> Path:
 async def open_session():
     env = dict(os.environ)
     env["HARBOR_MCP_ENABLE_WRITES"] = "true"  # publish_task is a gated write
-    params = StdioServerParameters(
-        command=sys.executable, args=["-m", "harbor_mcp.server"], env=env
-    )
+    params = StdioServerParameters(command=sys.executable, args=["-m", "harbor_mcp.server"], env=env)
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as s:
             await s.initialize()
@@ -104,16 +96,12 @@ async def test_publish_then_check_roundtrip(tmp_path):
     task_dir = _write_scratch_task(tmp_path / "scratch", org)
 
     async with open_session() as session:
-        published = await call(
-            session, "publish_task", task_dir=str(task_dir), visibility="private"
-        )
+        published = await call(session, "publish_task", task_dir=str(task_dir), visibility="private")
         assert published["name"] == f"{org}/{SCRATCH_NAME}"
         content_hash = published["content_hash"]
         assert content_hash
 
         # Read the write back through the registry: it is visible and matches.
-        checked = await call(
-            session, "check_task_published", org=org, name=SCRATCH_NAME
-        )
+        checked = await call(session, "check_task_published", org=org, name=SCRATCH_NAME)
         assert checked["published"] is True
         assert checked["content_hash"] == content_hash

@@ -2,7 +2,7 @@
         validate-tasks evals mock-api benchmark-build benchmark benchmark-view selftest
 
 lint:
-	uv run ruff check .
+	uv run ruff check . && uv run ruff format --check .
 
 lint-fix:
 	uv run ruff check . --fix

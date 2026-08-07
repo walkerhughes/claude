@@ -59,8 +59,7 @@ def job_gone_from_hub(workspace: Path) -> bool:
         payload = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"could not check whether job {job_id!r} is gone: "
-            f"`harbor hub job show` returned unparseable JSON: {exc}"
+            f"could not check whether job {job_id!r} is gone: `harbor hub job show` returned unparseable JSON: {exc}"
         ) from exc
     # A deleted (or never-existent) job returns an empty object; a live job
     # carries a "stats" block. Treat empty/absent as gone.

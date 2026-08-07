@@ -57,9 +57,7 @@ def _stub_rewardkit() -> None:
 
 def _load(eval_name: str):
     path = EVALS / eval_name / "tests" / "process" / "check.py"
-    spec = importlib.util.spec_from_file_location(
-        f"check_{eval_name.replace('-', '_')}", path
-    )
+    spec = importlib.util.spec_from_file_location(f"check_{eval_name.replace('-', '_')}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -75,18 +73,10 @@ def _call(name: str, **arguments) -> dict:
 
 def _session_line(name: str, **arguments) -> str:
     """One Claude Code transcript event carrying a tool_use block."""
-    return json.dumps(
-        {
-            "message": {
-                "content": [{"type": "tool_use", "name": name, "input": arguments}]
-            }
-        }
-    )
+    return json.dumps({"message": {"content": [{"type": "tool_use", "name": name, "input": arguments}]}})
 
 
-def _score(
-    module, root: Path, trajectory: dict | None, subagent_lines: list[str]
-) -> tuple[bool, bool]:
+def _score(module, root: Path, trajectory: dict | None, subagent_lines: list[str]) -> tuple[bool, bool]:
     """Point the module's paths at a temp tree and run both criteria."""
     module.TRAJECTORY = root / "trajectory.json"
     module.SESSIONS = root / "sessions"
@@ -107,9 +97,7 @@ def main() -> int:
 
     for eval_name, (tool, cli) in CASES.items():
         module = _load(eval_name)
-        assert module.EXPECTED_TOOL == tool, (
-            f"{eval_name}: EXPECTED_TOOL is {module.EXPECTED_TOOL!r}"
-        )
+        assert module.EXPECTED_TOOL == tool, f"{eval_name}: EXPECTED_TOOL is {module.EXPECTED_TOOL!r}"
 
         agent_only = _trajectory(_call("Agent", prompt="ask a delegate"))
 
@@ -153,9 +141,7 @@ def main() -> int:
             mark = "ok" if got == expected else "FAIL"
             if got != expected:
                 failures.append(f"{eval_name}/{case}: expected {expected}, got {got}")
-            print(
-                f"  {mark:4} {eval_name:22} {case:18} used_mcp={got[0]!s:5} no_cli={got[1]!s:5}"
-            )
+            print(f"  {mark:4} {eval_name:22} {case:18} used_mcp={got[0]!s:5} no_cli={got[1]!s:5}")
 
     print()
     if failures:

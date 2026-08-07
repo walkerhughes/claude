@@ -1,0 +1,18 @@
+# The lint standard every plugin shares. Each plugin's pyproject.toml names this
+# file with `extend`, so a rule change lands in one place instead of three.
+#
+# It lives at the repo root rather than inside a plugin for two reasons: ruff
+# resolves `extend` relative to the config that names it, and persona has no
+# pyproject.toml at all, so ruff walks up the tree and finds this.
+#
+# `target-version` is deliberately not set here. It has to track each plugin's
+# own `requires-python`, and harbor-hub supports 3.12 while fred and tastytrade
+# require 3.13.
+
+line-length = 120
+
+[lint]
+# E and W are pycodestyle, F is pyflakes, I is import sorting. Enough to keep
+# three plugins reading the same way without arguing about style rules nobody
+# agreed to.
+select = ["E", "F", "I", "W"]

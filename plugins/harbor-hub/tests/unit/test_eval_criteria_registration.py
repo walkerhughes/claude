@@ -37,13 +37,10 @@ def _self_registering(tree: ast.Module) -> set[str]:
         )
         # A shared=True criterion does not self-register.
         shared = any(
-            isinstance(d, ast.Call) and any(k.arg == "shared" for k in d.keywords)
-            for d in node.decorator_list
+            isinstance(d, ast.Call) and any(k.arg == "shared" for k in d.keywords) for d in node.decorator_list
         )
         args = node.args
-        only_workspace = (
-            len(args.posonlyargs) + len(args.args) == 1 and not args.kwonlyargs
-        )
+        only_workspace = len(args.posonlyargs) + len(args.args) == 1 and not args.kwonlyargs
         if decorated and only_workspace and not shared:
             names.add(node.name)
     return names
@@ -56,10 +53,7 @@ def _explicit_criteria_calls(tree: ast.Module) -> set[str]:
         if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
             continue
         func = node.value.func
-        if (
-            isinstance(func, ast.Attribute)
-            and getattr(func.value, "id", "") == "criteria"
-        ):
+        if isinstance(func, ast.Attribute) and getattr(func.value, "id", "") == "criteria":
             calls.add(func.attr)
     return calls
 

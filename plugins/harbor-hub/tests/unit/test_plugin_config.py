@@ -50,6 +50,4 @@ def test_manifest_version_matches_nothing_stale():
     """
     version = json.loads(PLUGIN_MANIFEST.read_text())["version"]
     parts = version.split(".")
-    assert len(parts) == 3 and all(p.isdigit() for p in parts), (
-        f"version {version!r} must be MAJOR.MINOR.PATCH"
-    )
+    assert len(parts) == 3 and all(p.isdigit() for p in parts), f"version {version!r} must be MAJOR.MINOR.PATCH"

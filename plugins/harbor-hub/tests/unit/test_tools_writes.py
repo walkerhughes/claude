@@ -33,9 +33,7 @@ def writes_off(monkeypatch):
     monkeypatch.delenv("HARBOR_MCP_ENABLE_WRITES", raising=False)
 
 
-@pytest.mark.parametrize(
-    ("tool", "kwargs"), TOOL_CALLS, ids=[t.__name__ for t, _ in TOOL_CALLS]
-)
+@pytest.mark.parametrize(("tool", "kwargs"), TOOL_CALLS, ids=[t.__name__ for t, _ in TOOL_CALLS])
 async def test_every_tool_blocked_without_env_flag(writes_off, tool, kwargs):
     payload = json.loads(await tool(**kwargs))
     assert payload["error"] == "Write tools are disabled."
@@ -97,16 +95,12 @@ async def test_publish_task_happy_path(writes_on, monkeypatch):
     publisher = MagicMock(publish_task=AsyncMock(return_value=result))
     monkeypatch.setattr(writes, "_publisher", lambda: publisher)
 
-    payload = json.loads(
-        await writes.publish_task("/tmp/task", visibility="public", tags="stable, v1")
-    )
+    payload = json.loads(await writes.publish_task("/tmp/task", visibility="public", tags="stable, v1"))
     assert payload["name"] == "hello-world"
     assert payload["revision"] == 2
     assert "archive_path" not in payload
     assert "rpc_time_sec" not in payload
-    publisher.publish_task.assert_awaited_once_with(
-        Path("/tmp/task"), tags={"stable", "v1"}, visibility="public"
-    )
+    publisher.publish_task.assert_awaited_once_with(Path("/tmp/task"), tags={"stable", "v1"}, visibility="public")
 
 
 async def test_publish_task_rejects_invalid_visibility(writes_on):
@@ -129,9 +123,7 @@ async def test_publish_dataset_happy_path(writes_on, monkeypatch):
     assert payload["name"] == "my-dataset"
     assert payload["task_count"] == 10
     assert "rpc_time_sec" not in payload
-    publisher.publish_dataset.assert_awaited_once_with(
-        Path("/tmp/dataset"), tags=None, visibility="private"
-    )
+    publisher.publish_dataset.assert_awaited_once_with(Path("/tmp/dataset"), tags=None, visibility="private")
 
 
 async def test_publish_dataset_rejects_invalid_visibility(writes_on):
@@ -153,9 +145,7 @@ async def test_download_job_happy_path(writes_on, monkeypatch):
     assert payload["job_name"] == "my-job"
     assert payload["output_dir"] == "/tmp/out/my-job"
     assert "manifest_path" not in payload
-    downloader.download_job.assert_awaited_once_with(
-        uuid.UUID(JOB_ID), Path("/tmp/out"), overwrite=True
-    )
+    downloader.download_job.assert_awaited_once_with(uuid.UUID(JOB_ID), Path("/tmp/out"), overwrite=True)
 
 
 async def test_download_job_rejects_invalid_uuid(writes_on):
@@ -182,9 +172,7 @@ async def test_set_job_visibility_happy_path(writes_on, monkeypatch):
 
 
 async def test_set_job_visibility_not_found(writes_on, monkeypatch):
-    db = MagicMock(
-        get_job=AsyncMock(return_value=None), update_job_visibility=AsyncMock()
-    )
+    db = MagicMock(get_job=AsyncMock(return_value=None), update_job_visibility=AsyncMock())
     monkeypatch.setattr(writes, "_upload_db", lambda: db)
 
     payload = json.loads(await writes.set_job_visibility(JOB_ID, "private"))
@@ -210,9 +198,7 @@ async def test_share_job_happy_path_surfaces_warnings(writes_on, monkeypatch):
     )
     monkeypatch.setattr(writes, "_upload_db", lambda: db)
 
-    payload = json.loads(
-        await writes.share_job(JOB_ID, org_names="acme", usernames="alice, bob")
-    )
+    payload = json.loads(await writes.share_job(JOB_ID, org_names="acme", usernames="alice, bob"))
     assert payload["result"] == rpc_result
     assert payload["org_names"] == ["acme"]
     assert payload["usernames"] == ["alice", "bob"]

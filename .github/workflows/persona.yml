@@ -27,6 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      # persona has no pyproject.toml, so ruff walks up and finds the repo-root
+      # ruff.toml. That is the same standard the other three plugins extend, so
+      # this file is linted to the same rules without carrying a config.
+      - name: Lint
+        run: uvx ruff check . && uvx ruff format --check .
 
       # The script already ships its own check, so CI runs that rather than
       # growing a second, parallel notion of what "working" means. It imports and

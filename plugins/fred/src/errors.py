@@ -44,16 +44,14 @@ _BODY_GUIDANCE: tuple[tuple[str, list[str]], ...] = (
         "no vintage dates exist",
         [
             "This asks for revision history over a real-time window that has none.",
-            "get_revisions sets the window itself; call it rather than passing "
-            "realtime_start or realtime_end by hand.",
+            "get_revisions sets the window itself; call it rather than passing realtime_start or realtime_end by hand.",
         ],
     ),
     (
         "frequency",
         [
             "A series can only be aggregated to a coarser frequency, never a finer one.",
-            "Check the series' native frequency with get_series, then request that or coarser: "
-            "d, w, bw, m, q, sa, a.",
+            "Check the series' native frequency with get_series, then request that or coarser: d, w, bw, m, q, sa, a.",
         ],
     ),
     (

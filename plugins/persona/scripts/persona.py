@@ -60,9 +60,7 @@ def _blocks_to_text(content):
     if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
         return ""
     return "\n".join(
-        b["text"]
-        for b in content
-        if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)
+        b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)
     )
 
 
@@ -289,7 +287,8 @@ let items = [], i = 0;
 
 const titles = {
   critique: ["Does this sound like you?",
-    "Your own words, pulled from your transcripts. Mark the ones that read as characteristically you, and say what is off about the ones that don't."],
+    "Your own words, pulled from your transcripts. Mark the ones that read as "
+    + "characteristically you, and say what is off about the ones that don't."],
   turing: ["Who wrote this?",
     "Some of these you wrote. Some a subagent wrote trying to sound like you. No feedback until the end."],
 };
