@@ -34,11 +34,19 @@ jobs:
           for manifest in plugins/*/.claude-plugin/plugin.json; do
             plugin="${manifest%/.claude-plugin/plugin.json}"
 
-            # Only the shipped payload matters. Tests and evals are not copied
-            # into the plugin cache, so changing them cannot strand a user.
+            # Only the shipped payload matters. None of these reach a user's
+            # installed copy, so changing them cannot strand anyone: tests and
+            # evals do not run there, the Makefile is dev tooling, and CLAUDE.md
+            # is guidance for agents working on this repo rather than anything
+            # the plugin loads.
+            #
+            # Left in scope on purpose: pyproject.toml, which really can change
+            # what gets installed.
             if ! git diff --name-only "$BASE"...HEAD -- "$plugin" \
                  ":(exclude)$plugin/tests/**" \
-                 ":(exclude)$plugin/evals/**" | grep -q .; then
+                 ":(exclude)$plugin/evals/**" \
+                 ":(exclude)$plugin/Makefile" \
+                 ":(exclude)$plugin/CLAUDE.md" | grep -q .; then
               echo "$plugin: no shipped files changed, version bump not required."
               continue
             fi

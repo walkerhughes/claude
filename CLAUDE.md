@@ -7,6 +7,12 @@ These rules are derived from what the existing plugins already do. When they
 disagree, the majority of the three MCP plugins wins, and the divergence is
 listed under [Known drift](#known-drift) rather than left implicit.
 
+Each plugin has its own `CLAUDE.md` with the upstream docs worth reading and the
+things true only of that plugin. Read it before working in one:
+[fred](plugins/fred/CLAUDE.md), [harbor-hub](plugins/harbor-hub/CLAUDE.md),
+[persona](plugins/persona/CLAUDE.md),
+[tastytrade](plugins/tastytrade/CLAUDE.md).
+
 ## Layout
 
 ```
@@ -34,8 +40,10 @@ stdlib-only script, with no server, no dependencies, and no build.
 installed plugin under a path keyed by that version, so shipping without a bump
 means installed copies never refresh no matter how many times a user reinstalls.
 The change is invisible rather than broken, which is the worst way to fail.
-`plugin-version.yml` enforces this and excludes `tests/**` and `evals/**`, which
-are not copied into the cache.
+`plugin-version.yml` enforces this. It exempts what never reaches an installed
+copy: `tests/**`, `evals/**`, the `Makefile`, and `CLAUDE.md`. Everything else
+in the plugin directory counts, `pyproject.toml` included, because that really
+can change what gets installed.
 
 A new plugin needs an entry in `marketplace.json` too. The version gate
 discovers plugins by globbing manifests, so it needs no edit.

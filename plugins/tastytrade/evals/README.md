@@ -1,7 +1,7 @@
 # Evals
 
 The server is evaluated at the agent-loop level: Claude Code drives the tools over a set of
-tasks using the [Harbor](https://github.com/laude-institute/harbor) framework, and each trial
+tasks using the [Harbor](https://github.com/harbor-framework/harbor) framework, and each trial
 records reward, tool calls, tokens, and latency.
 
 This used to run two agents, a baseline ref and a candidate ref, to show the refactored server

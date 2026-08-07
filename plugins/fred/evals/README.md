@@ -2,7 +2,7 @@
 
 The server is evaluated at the agent-loop level, where it actually runs: Claude Code
 drives the tools over a set of tasks using the
-[Harbor](https://github.com/laude-institute/harbor) framework, and each trial records
+[Harbor](https://github.com/harbor-framework/harbor) framework, and each trial records
 reward, tool calls, tokens, and latency.
 
 Every task runs against the mock FRED API in `tests/fixtures/fred_api.py`, so the answers
