@@ -57,22 +57,64 @@ to the CLI -- still produces a correct answer and still scores 1.0. That
 fallback is exactly the regression these evals exist to catch, so `process`
 grades the agent's ATIF trajectory at `/logs/agent/trajectory.json`:
 
-- `criteria.trajectory_tool_used("mcp__harbor-hub__<tool>")` -- the eval's
-  expected tool was actually called. Claude Code names MCP tools
-  `mcp__<server>__<tool>`, where `<server>` is the
+- `used_mcp_tool` -- the eval's expected tool was actually called. Claude Code
+  names MCP tools `mcp__<server>__<tool>`, where `<server>` is the
   `[[environment.mcp_servers]]` name from `task.toml`.
-- `no_harbor_cli` (local `@criterion`) -- no `Bash` tool call in the trajectory
-  invoked the `harbor` CLI. `trajectory_tool_not_used("Bash")` would be wrong
-  here: the agent legitimately needs Bash to read `$EVAL_*` and write the
-  answer.
+- `no_harbor_cli` -- no `Bash` call invoked the `harbor` CLI. Bash only, on
+  purpose: shelling out is the whole bypass, and nothing else in this image
+  runs a command. `trajectory_tool_not_used("Bash")` would be wrong here, since
+  the agent legitimately needs Bash to read `$EVAL_*` and write the answer.
 
-Both trajectory criteria **fail closed**: a missing or unreadable trajectory
-scores 0, never a silent pass.
+Both **fail closed**: no record scores 0, never a silent pass. That is why the
+oracle and nop agents score 0 on `process`.
 
-> Gotcha, if you add more trajectory criteria: rewardkit's built-ins default to
+### Both criteria read the transcripts, not just the trajectory
+
+harbor builds `trajectory.json` from the **main session only**: its session-dir
+scan drops any jsonl whose path contains a `subagents/` component, which is
+exactly where Claude Code writes a delegate's transcript. A call the agent hands
+to a subagent therefore leaves an `Agent` entry in the trajectory and no tool.
+
+So both criteria read the raw transcripts under `/logs/agent/sessions` as well,
+and stop caring who placed the call. Whether the top-level agent called the tool
+or routed it through a delegate is the harness's decision, not a fact about this
+plugin.
+
+That has to cut both ways. Crediting a delegated MCP call while missing a
+delegated `harbor hub job show` would turn "ask a subagent" into an invisible
+bypass, so the CLI criterion reads the same union, and `make validate-process`
+asserts both directions.
+
+> Gotcha, if you add a rewardkit built-in trajectory criterion: they default to
 > `path="/logs/trajectory.json"`, but Harbor agents write
 > `/logs/agent/trajectory.json`. The wrong path is not an error -- the file is
-> just missing and the criterion returns 0. Always pass `path` explicitly.
+> just missing and the criterion returns 0. Always pass `path` explicitly, and
+> note that a built-in sees the main session only, with the blind spot above.
+
+### Check them without a hub
+
+`make validate-process` scores every eval's real `process` criteria against
+synthetic runs. No Harbor, no hub, no API key, no Docker, no model:
+
+| case | trajectory | expected |
+| --- | --- | --- |
+| `solved` | the MCP tool was called | 1, 1 |
+| `empty` | nothing | 0, 0 |
+| `bypassed` | shelled out to the harbor CLI | 0, 0 |
+| `fell-back` | called the tool, then shelled out anyway | 1, 0 |
+| `delegated` | subagent called the MCP tool | 1, 1 |
+| `delegated-bypass` | subagent shelled out to the CLI | 0, 0 |
+| `benign-bash` | called the tool, plus an unrelated Bash call | 1, 1 |
+
+The bypass rows are the point, and they are what `harbor run -a oracle` cannot
+tell you: the oracle takes the intended route by construction, so it proves an
+eval is solvable and says nothing about whether a bypass would be caught.
+
+It runs on the host, unlike `eval-safety`. rewardkit is not importable on macOS
+(its litellm dependency wants a newer rustc than ships there), so the script
+stubs it and loads the real `check.py` from disk. The criteria bodies under test
+are the ones that will really grade a gate run; only rewardkit's scoring layer
+is absent.
 
 ## The instructions must not name the tool
 
