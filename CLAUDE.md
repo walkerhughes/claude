@@ -198,16 +198,15 @@ Real today, worth closing. Do not copy these into a new plugin.
 
 | What | fred | tastytrade | harbor-hub |
 | --- | --- | --- | --- |
-| Uploads on PR runs | yes | yes | **push only** |
-| Names failing trials on failure | `explain_trials.py` | `explain_trials.py` | **cats verifier output** |
-| Cheap CI job name | `check` | `check` | `lint-unit` |
 | Validator scope | outcome + process | outcome + process | **process only** |
 | `EVAL_ATTEMPTS` / `EVAL_MIN_MEAN` | set | set | unset |
 | Makefile `check` / `typecheck` / `format` / `coverage` | yes | yes | **no** |
 
-The first two are the ones that bite: both are behaviours fred and tastytrade
-adopted deliberately after being burned, and harbor-hub still has the version
-they moved away from.
+Each needs a decision rather than a copy. harbor-hub's outcome criteria query a
+live hub, so scoring them offline would mean faking it; its
+`check_reward.py` has no `--min-mean`, and with three evals rather than ten the
+flaky-task argument that motivated the threshold is weaker; and `typecheck`
+would mean adding mypy to a plugin that has never had it.
 
 Differences that are **not** drift, because harbor-hub grades against a live hub
 rather than a mock: no `job.yaml`, no `generate_tasks.py`, no mock scripts, tasks

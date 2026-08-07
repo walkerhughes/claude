@@ -19,7 +19,7 @@ defaults:
     working-directory: plugins/harbor-hub
 
 jobs:
-  lint-unit:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +100,7 @@ jobs:
     # server and passes a PR that breaks the MCP -- a green check that means
     # nothing. On a push to main the head sha IS main.
     runs-on: ubuntu-latest
-    needs: [lint-unit]
+    needs: [check]
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     concurrency:
       group: harbor-hub-evals
@@ -161,7 +161,10 @@ jobs:
           # Push to main only. PR runs would mint a hub job per push with
           # nothing to clean them up; main's runs are the ones worth keeping a
           # reward/cost/token trend for.
-          EVALS_UPLOAD: ${{ github.event_name == 'push' && '1' || '' }}
+          # Every gate run uploads, PR included: gating uploads to main left a PR
+          # gate with nothing on the hub, so the only record was a CI artifact
+          # expiring in 7 days. fred and tastytrade already do this.
+          EVALS_UPLOAD: "1"
         run: make evals
       # A `process` failure is only diagnosable from the agent's trajectory:
       # the score alone cannot distinguish a tool-name mismatch from a real
